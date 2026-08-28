@@ -1,0 +1,4 @@
+const test=require("node:test"); const assert=require("node:assert/strict"); const Metrics=require("../src/metrics.js");
+test("metrics calculate net and raw WPM plus accuracy",()=>{ const m=Metrics.summarize({correct:200,total:225,elapsedMs:60000,samples:[40,50,60]}); assert.equal(m.wpm,40); assert.equal(m.rawWpm,45); assert.equal(m.accuracy,88.89); assert.ok(m.consistency>80&&m.consistency<100); });
+test("metrics are finite for an empty instant session",()=>{ const m=Metrics.summarize({correct:0,total:0,elapsedMs:0,samples:[]}); for(const value of Object.values(m))assert.ok(Number.isFinite(value)); });
+test("interval WPM measures only keys typed during the sample window",()=>{ assert.equal(Metrics.intervalWpm(10,5,1000),60); assert.equal(Metrics.intervalWpm(5,10,1000),0); assert.equal(Metrics.intervalWpm(Infinity,0,0),0); });

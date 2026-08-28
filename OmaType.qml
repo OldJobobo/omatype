@@ -1,0 +1,1128 @@
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Io
+import Quickshell.Wayland
+import qs.Commons
+import "src/generator.js" as Generator
+import "src/typing-state.js" as TypingState
+import "src/metrics.js" as Metrics
+import "src/history.js" as History
+import "src/settings.js" as Settings
+import "src/input-policy.js" as InputPolicy
+import "src/ipc-policy.js" as IpcPolicy
+import "src/layout.js" as Layout
+import "src/languages.js" as Languages
+import "src/words.js" as WordList
+import "components/settings" as SettingsUi
+
+Item {
+    id: root
+
+    property var shell: null
+    property var manifest: null
+    property bool opened: false
+    property string mode: "time"
+    property int amount: 30
+    property string language: "english"
+    property string activeLanguage: "english"
+    property bool languagePanelOpen: false
+    property bool punctuation: false
+    property bool numbers: false
+    property string seed: "omatype-" + Date.now()
+    property var typing: null
+    property var generated: null
+    property var samples: []
+    property var result: null
+    // Epoch milliseconds exceed a QML int. Keeping this as double prevents
+    // elapsed time from collapsing to one millisecond on real sessions.
+    property double nowMs: Date.now()
+    property bool settingsOpen: false
+    property real activeWordY: 0
+    property int generationBatch: 0
+    property int sampledKeystrokes: 0
+    property double lastSampleMs: 0
+    property var userSettings: Settings.defaults()
+    property var activeSettings: Settings.defaults()
+    readonly property var runtimeSettings: root.activeSettings
+    readonly property string activeMode: root.activeSettings.test.mode
+    readonly property int activeAmount: root.activeSettings.test.mode === "time" ? root.activeSettings.test.time : root.activeSettings.test.words
+    property var wordLayout: []
+
+    readonly property var timeOptions: [15, 30, 60, 120]
+    readonly property var wordOptions: [10, 25, 50, 100]
+    readonly property var settingsSections: ["test", "behavior", "display", "caret", "access"]
+    readonly property var settingsCategories: ["test", "behavior", "appearance", "caret", "accessibility"]
+    readonly property var languageOptions: Languages.options()
+    readonly property var currentLanguagePack: Languages.get(root.language)
+    readonly property var activeLanguagePack: Languages.get(root.activeLanguage)
+    readonly property bool programmingLanguage: activeLanguagePack.category === "programming"
+    readonly property color backgroundColor: Color.background
+    readonly property color accentColor: Color.accent
+    readonly property color textColor: Color.foreground
+    readonly property color mutedColor: root.runtimeSettings.accessibility.highContrast ? root.textColor : Color.muted
+    readonly property color errorColor: Color.urgent
+    readonly property color controlColor: Style.normalFill
+    readonly property string typeface: Style.font.family
+    readonly property bool focusMode: typing && typing.startedAt !== null && !result
+    readonly property int elapsedMs: typing && typing.startedAt !== null ? nowMs - typing.startedAt : 0
+    readonly property int remainingSeconds: Math.max(0, activeAmount - Math.floor(elapsedMs / 1000))
+    readonly property var liveMetrics: Metrics.summarize({
+        elapsedMs: root.elapsedMs,
+        correct: root.typing ? root.typing.totalKeystrokes - root.typing.errorKeystrokes : 0,
+        total: root.typing ? root.typing.totalKeystrokes : 0,
+        samples: root.samples
+    })
+    readonly property int activeWordIndex: wordIndexAt(typing ? typing.cursor : 0)
+    readonly property real characterWidth: root.runtimeSettings.appearance.fontSize * 0.6016
+    readonly property int caretSmoothDuration: {
+        if (root.runtimeSettings.accessibility.reducedMotion) return 0
+        var smooth = root.runtimeSettings.caret.smooth
+        if (smooth === "slow") return 180
+        if (smooth === "medium") return 100
+        if (smooth === "fast") return 55
+        return 0
+    }
+    readonly property color caretColor: {
+        var choice = root.runtimeSettings.caret.color
+        if (choice === "foreground") return root.textColor
+        if (choice === "error") return root.errorColor
+        if (choice === "custom") return root.runtimeSettings.caret.customColor
+        return root.accentColor
+    }
+
+    onActiveWordIndexChanged: Qt.callLater(function() {
+        var item = wordRepeater.itemAt(activeWordIndex)
+        if (item) activeWordY = item.y
+    })
+
+    function isPrintable(text) {
+        if (typeof text !== "string" || Array.from(text).length !== 1) return false
+        var codePoint = text.codePointAt(0)
+        return codePoint >= 0x20 && codePoint !== 0x7f
+    }
+
+    function loadSettings(syncSetup) {
+        root.userSettings = Settings.normalize({
+            schemaVersion: settingsAdapter.schemaVersion,
+            test: settingsAdapter.test,
+            behavior: settingsAdapter.behavior,
+            caret: settingsAdapter.caret,
+            appearance: settingsAdapter.appearance,
+            accessibility: settingsAdapter.accessibility
+        })
+        if (syncSetup === true) root.syncStoredTestSettings()
+    }
+
+    function migrateLegacySettings() {
+        root.userSettings = Settings.normalize({
+            schemaVersion: legacySettingsAdapter.schemaVersion,
+            test: legacySettingsAdapter.test,
+            behavior: legacySettingsAdapter.behavior,
+            caret: legacySettingsAdapter.caret,
+            appearance: legacySettingsAdapter.appearance,
+            accessibility: legacySettingsAdapter.accessibility
+        })
+        root.syncStoredTestSettings()
+        root.persistSettings()
+    }
+
+    function syncStoredTestSettings() {
+        root.mode = root.userSettings.test.mode
+        root.amount = root.mode === "time" ? root.userSettings.test.time : root.userSettings.test.words
+        root.language = root.userSettings.test.language
+        root.punctuation = root.userSettings.test.punctuation
+        root.numbers = root.userSettings.test.numbers
+    }
+
+    function persistSettings() {
+        settingsAdapter.schemaVersion = root.userSettings.schemaVersion
+        settingsAdapter.test = root.userSettings.test
+        settingsAdapter.behavior = root.userSettings.behavior
+        settingsAdapter.caret = root.userSettings.caret
+        settingsAdapter.appearance = root.userSettings.appearance
+        settingsAdapter.accessibility = root.userSettings.accessibility
+        settingsStore.writeAdapter()
+    }
+
+    function applySetting(category, key, value) {
+        if (!Settings.isValidUpdate(root.userSettings, category, key, value)) return false
+        var activeRun = root.focusMode
+        root.userSettings = Settings.update(root.userSettings, category, key, value)
+        persistSettings()
+        if (category === "test") root.syncStoredTestSettings()
+        if ((category === "test" || category === "behavior") && root.opened && !activeRun) root.newTest()
+        if (category === "appearance" && !activeRun) Qt.callLater(function() { root.rebuildWordLayout(wordsClip.width) })
+        return true
+    }
+
+    function resetCaretSettings() {
+        root.resetSettingsCategory("caret")
+    }
+
+    function resetSettingsCategory(category) {
+        var activeRun = root.focusMode
+        root.userSettings = Settings.resetCategory(root.userSettings, category)
+        persistSettings()
+        if (category === "test") root.syncStoredTestSettings()
+        if ((category === "test" || category === "behavior") && root.opened && !activeRun) root.newTest()
+        if (category === "appearance" && !activeRun) Qt.callLater(function() { root.rebuildWordLayout(wordsClip.width) })
+    }
+
+    function applyAutomationTransaction(payload, validSettingPayload, validResetPayload) {
+        if (!validSettingPayload && !validResetPayload) return
+        var nextSettings = root.userSettings
+        if (validSettingPayload) nextSettings = Settings.update(nextSettings, payload.setting.category, payload.setting.key, payload.setting.value)
+        if (validResetPayload) nextSettings = Settings.resetCategory(nextSettings, payload.resetCategory)
+        root.userSettings = nextSettings
+        root.persistSettings()
+        var testTouched = (validSettingPayload && payload.setting.category === "test")
+            || (validResetPayload && payload.resetCategory === "test")
+        var appearanceTouched = (validSettingPayload && payload.setting.category === "appearance")
+            || (validResetPayload && payload.resetCategory === "appearance")
+        if (testTouched) root.syncStoredTestSettings()
+        if (appearanceTouched && !root.focusMode) Qt.callLater(function() { root.rebuildWordLayout(wordsClip.width) })
+    }
+
+    function activeWordSource() {
+        return root.activeLanguage === "english" ? WordList.words : root.activeLanguagePack.words
+    }
+
+    function openLanguagePanel() {
+        root.settingsOpen = false
+        root.languagePanelOpen = true
+        var current = -1
+        for (var i = 0; i < root.languageOptions.length; ++i) {
+            if (root.languageOptions[i].id === root.language) { current = i; break }
+        }
+        languageGrid.currentIndex = current >= 0 ? current : 0
+    }
+
+    function chooseLanguage(languageId) {
+        if (!Languages.has(languageId)) return
+        var activeRun = root.focusMode
+        root.language = languageId
+        root.userSettings = Settings.update(root.userSettings, "test", "language", languageId)
+        root.persistSettings()
+        root.languagePanelOpen = false
+        if (!activeRun) root.restart()
+        else Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+    }
+
+    function rebuildWordLayout(viewportWidth) {
+        root.wordLayout = Layout.centeredWords(
+            root.generated && root.generated.words ? root.generated.words : [],
+            Math.max(1, viewportWidth),
+            root.characterWidth,
+            root.runtimeSettings.appearance.wordSpacing,
+            root.runtimeSettings.appearance.lineHeight
+        )
+    }
+
+    function open(payloadJson) {
+        var payload = IpcPolicy.parsePayload(payloadJson)
+        if (payload === null) return
+        var activeRunBeforeAutomation = root.opened && root.focusMode
+        var validSettingPayload = payload.setting && typeof payload.setting === "object" && !Array.isArray(payload.setting)
+            && settingsCategories.indexOf(payload.setting.category) >= 0
+            && typeof payload.setting.key === "string" && payload.setting.key.length <= 64
+            && Settings.isValidUpdate(root.userSettings, payload.setting.category, payload.setting.key, payload.setting.value)
+        if (Object.prototype.hasOwnProperty.call(payload, "setting") && !validSettingPayload) return
+        var validResetPayload = settingsCategories.indexOf(payload.resetCategory) >= 0
+        if (Object.prototype.hasOwnProperty.call(payload, "resetCategory") && !validResetPayload) return
+        if (!root.opened) root.loadSettings(true)
+        root.applyAutomationTransaction(payload, validSettingPayload, validResetPayload)
+        if ((validSettingPayload || validResetPayload) && activeRunBeforeAutomation) {
+            if (payload.settings === true) {
+                settingsOpen = true
+                var activeSection = settingsSections.indexOf(payload.settingsSection) >= 0 ? payload.settingsSection : "test"
+                Qt.callLater(function() { settingsPanel.currentSection = activeSection })
+            }
+            Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+            return
+        }
+        var requestedMode = payload.mode === "time" || payload.mode === "words" ? payload.mode : mode
+        if (requestedMode !== mode) amount = requestedMode === "time" ? 30 : 25
+        mode = requestedMode
+        var requestedAmount = Number(payload.amount)
+        var allowedAmounts = mode === "time" ? timeOptions : wordOptions
+        if (Number.isFinite(requestedAmount) && allowedAmounts.indexOf(requestedAmount) >= 0) amount = requestedAmount
+        if (Languages.has(payload.language)) language = payload.language
+        if (typeof payload.punctuation === "boolean") punctuation = payload.punctuation
+        if (typeof payload.numbers === "boolean") numbers = payload.numbers
+        var requestedSettingsSection = settingsSections.indexOf(payload.settingsSection) >= 0 ? payload.settingsSection : "test"
+        settingsOpen = payload.settings === true
+        languagePanelOpen = false
+        seed = typeof payload.seed === "string" && payload.seed.length > 0
+            ? String(payload.seed).slice(0, 128)
+            : "omatype-" + Date.now()
+        opened = true
+        newTest()
+        if (settingsOpen) Qt.callLater(function() { settingsPanel.currentSection = requestedSettingsSection })
+        Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+    }
+
+    function close() {
+        opened = false
+        settingsOpen = false
+        languagePanelOpen = false
+    }
+
+    function dismiss() {
+        if (shell && typeof shell.hide === "function") shell.hide("jobo.omatype")
+        else close()
+    }
+
+    function newTest() {
+        var snapshot = Settings.normalize(root.userSettings)
+        snapshot.test.mode = root.mode
+        snapshot.test.time = root.mode === "time" ? root.amount : snapshot.test.time
+        snapshot.test.words = root.mode === "words" ? root.amount : snapshot.test.words
+        snapshot.test.language = root.language
+        snapshot.test.punctuation = root.punctuation
+        snapshot.test.numbers = root.numbers
+        root.activeSettings = Settings.normalize(snapshot)
+        var count = root.activeSettings.test.mode === "words" ? root.activeSettings.test.words : 320
+        activeLanguage = root.activeSettings.test.language
+        generationBatch = 0
+        generated = Generator.generate({
+            mode: root.activeSettings.test.mode,
+            amount: count,
+            seed: seed,
+            words: root.activeWordSource(),
+            punctuation: root.activeSettings.test.punctuation && !root.programmingLanguage,
+            numbers: root.activeSettings.test.numbers && !root.programmingLanguage
+        })
+        typing = TypingState.create(generated.text)
+        samples = []
+        sampledKeystrokes = 0
+        lastSampleMs = 0
+        result = null
+        nowMs = Date.now()
+        activeWordY = 0
+        Qt.callLater(function() {
+            root.rebuildWordLayout(wordsClip.width)
+            keyboardRoot.forceActiveFocus()
+            var item = wordRepeater.itemAt(0)
+            if (item) activeWordY = item.y
+        })
+    }
+
+    function appendTimeWords() {
+        if (root.activeSettings.test.mode !== "time" || !generated || !typing) return
+        generationBatch++
+        var batch = Generator.generate({
+            mode: root.activeSettings.test.mode,
+            amount: 160,
+            seed: seed + "-batch-" + generationBatch,
+            words: root.activeWordSource(),
+            punctuation: root.activeSettings.test.punctuation && !root.programmingLanguage,
+            numbers: root.activeSettings.test.numbers && !root.programmingLanguage
+        })
+        var nextWords = generated.words.concat(batch.words)
+        var nextText = nextWords.join(" ")
+        generated = {seed: seed, mode: root.activeSettings.test.mode, words: nextWords, text: nextText}
+        root.rebuildWordLayout(wordsClip.width)
+        typing.target = nextText
+        typing.completed = false
+        typing.endedAt = null
+        typing = Object.assign({}, typing)
+    }
+
+    function restart() {
+        seed = "omatype-" + Date.now()
+        newTest()
+    }
+
+    function chooseMode(value) {
+        root.applySetting("test", "mode", value)
+    }
+
+    function chooseAmount(value) {
+        root.applySetting("test", root.mode === "time" ? "time" : "words", value)
+    }
+
+    function globalStartForWord(wordIndex) {
+        if (!generated || !generated.words) return 0
+        var offset = 0
+        for (var i = 0; i < wordIndex; ++i) offset += generated.words[i].length + 1
+        return offset
+    }
+
+    function wordIndexAt(cursor) {
+        if (!generated || !generated.words) return 0
+        var offset = 0
+        for (var i = 0; i < generated.words.length; ++i) {
+            var end = offset + generated.words[i].length
+            if (cursor <= end) return i
+            offset = end + 1
+        }
+        return Math.max(0, generated.words.length - 1)
+    }
+
+    function finishTest() {
+        if (result || !typing || typing.startedAt === null) return
+        var elapsed = Math.max(1, nowMs - typing.startedAt)
+        if (lastSampleMs <= 0) lastSampleMs = typing.startedAt
+        if (typing.totalKeystrokes > sampledKeystrokes && nowMs > lastSampleMs) {
+            samples = samples.concat([Metrics.intervalWpm(typing.totalKeystrokes, sampledKeystrokes, nowMs - lastSampleMs)])
+            sampledKeystrokes = typing.totalKeystrokes
+            lastSampleMs = nowMs
+        }
+        var summary = Metrics.summarize({
+            correct: typing.totalKeystrokes - typing.errorKeystrokes,
+            total: typing.totalKeystrokes,
+            elapsedMs: elapsed,
+            samples: samples
+        })
+        summary.timestamp = new Date(nowMs).toISOString()
+        summary.mode = root.activeSettings.test.mode
+        summary.amount = root.activeSettings.test.mode === "time" ? root.activeSettings.test.time : root.activeSettings.test.words
+        summary.language = activeLanguage
+        summary.seed = seed
+        summary.characters = typing.totalKeystrokes
+        summary.errors = typing.errorKeystrokes
+        summary.correct = typing.totalKeystrokes - typing.errorKeystrokes
+        summary.corrected = typing.correctedErrors
+        summary.uncorrectedErrors = typing.errors
+        summary.corrections = typing.corrections
+        result = summary
+        var normalized = History.add({schemaVersion: 1, entries: historyAdapter.entries}, summary)
+        historyAdapter.entries = normalized.entries
+        historyStore.writeAdapter()
+        Qt.callLater(function() { resultChart.requestPaint() })
+    }
+
+    Component.onCompleted: {
+        if (!settingsStore.loaded && legacySettingsStore.loaded) root.migrateLegacySettings()
+        else root.loadSettings(true)
+        newTest()
+    }
+
+    Timer {
+        interval: 100
+        running: root.opened && root.typing && root.typing.startedAt !== null && !root.result
+        repeat: true
+        onTriggered: {
+            root.nowMs = Date.now()
+            if (root.activeSettings.test.mode === "time" && root.elapsedMs >= root.activeSettings.test.time * 1000) root.finishTest()
+        }
+    }
+
+    Timer {
+        interval: 1000
+        running: root.opened && root.typing && root.typing.startedAt !== null && !root.result
+        repeat: true
+        onTriggered: {
+            var sampledAt = Date.now()
+            if (root.lastSampleMs <= 0) root.lastSampleMs = root.typing.startedAt
+            var sample = Metrics.intervalWpm(root.typing.totalKeystrokes, root.sampledKeystrokes, sampledAt - root.lastSampleMs)
+            root.samples = root.samples.concat([sample])
+            root.sampledKeystrokes = root.typing.totalKeystrokes
+            root.lastSampleMs = sampledAt
+        }
+    }
+
+    FileView {
+        id: historyStore
+        path: Quickshell.env("HOME") + "/.local/state/omarchy/omatype-history.json"
+        atomicWrites: true
+        blockLoading: true
+        watchChanges: true
+        onFileChanged: reload()
+        adapter: JsonAdapter {
+            id: historyAdapter
+            property int schemaVersion: 1
+            property var entries: []
+        }
+    }
+
+    FileView {
+        id: legacySettingsStore
+        path: Quickshell.env("HOME") + "/.local/state/omarchy/omatype-settings.json"
+        blockLoading: true
+        printErrors: false
+        adapter: JsonAdapter {
+            id: legacySettingsAdapter
+            property int schemaVersion: 1
+            property var test: ({})
+            property var behavior: ({})
+            property var caret: ({})
+            property var appearance: ({})
+            property var accessibility: ({})
+        }
+    }
+
+    FileView {
+        id: settingsStore
+        path: Quickshell.env("HOME") + "/.config/omarchy/omatype-settings.json"
+        atomicWrites: true
+        blockLoading: true
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.loadSettings(true)
+        adapter: JsonAdapter {
+            id: settingsAdapter
+            property int schemaVersion: 1
+            property var test: ({})
+            property var behavior: ({})
+            property var caret: ({})
+            property var appearance: ({})
+            property var accessibility: ({})
+        }
+    }
+
+    PanelWindow {
+        id: surface
+
+        screen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+        visible: root.opened
+        color: root.backgroundColor
+        exclusionMode: ExclusionMode.Ignore
+
+        WlrLayershell.namespace: "jobo-omatype"
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+
+        anchors {
+            top: true
+            bottom: true
+            left: true
+            right: true
+        }
+
+        FocusScope {
+            id: keyboardRoot
+            anchors.fill: parent
+            focus: true
+
+            Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Comma && (event.modifiers & Qt.ControlModifier)) {
+                    root.languagePanelOpen = false
+                    root.settingsOpen = !root.settingsOpen
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_L && (event.modifiers & Qt.ControlModifier)) {
+                    if (root.languagePanelOpen) root.languagePanelOpen = false
+                    else root.openLanguagePanel()
+                    event.accepted = true
+                    return
+                }
+                if (root.languagePanelOpen) {
+                    var nextLanguage = languageGrid.currentIndex < 0 ? 0 : languageGrid.currentIndex
+                    if (event.key === Qt.Key_Escape) root.languagePanelOpen = false
+                    else if (event.key === Qt.Key_Left) nextLanguage -= 1
+                    else if (event.key === Qt.Key_Right) nextLanguage += 1
+                    else if (event.key === Qt.Key_Up) nextLanguage -= 6
+                    else if (event.key === Qt.Key_Down) nextLanguage += 6
+                    else if (event.key === Qt.Key_Tab) nextLanguage += (event.modifiers & Qt.ShiftModifier) ? -1 : 1
+                    else if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return || event.key === Qt.Key_Space) {
+                        if (languageGrid.currentIndex >= 0 && languageGrid.currentIndex < root.languageOptions.length)
+                            root.chooseLanguage(root.languageOptions[languageGrid.currentIndex].id)
+                    }
+                    languageGrid.currentIndex = Math.max(0, Math.min(root.languageOptions.length - 1, nextLanguage))
+                    if (languageGrid.currentIndex >= 0) languageGrid.positionViewAtIndex(languageGrid.currentIndex, GridView.Contain)
+                    event.accepted = true
+                    return
+                }
+                if (root.settingsOpen) {
+                    if (event.key === Qt.Key_Escape) root.settingsOpen = false
+                    else if (event.key === Qt.Key_Tab) settingsPanel.focusRow(event.modifiers & Qt.ShiftModifier ? -1 : 1)
+                    else if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return || event.key === Qt.Key_Space) settingsPanel.activateFocusedRow(1)
+                    else if (event.key === Qt.Key_R) settingsPanel.resetCurrentSection()
+                    else if (event.key === Qt.Key_Left) settingsPanel.moveSection(-1)
+                    else if (event.key === Qt.Key_Right) settingsPanel.moveSection(1)
+                    else if (event.key === Qt.Key_Up || event.key === Qt.Key_PageUp) settingsPanel.scrollBy(-220)
+                    else if (event.key === Qt.Key_Down || event.key === Qt.Key_PageDown) settingsPanel.scrollBy(220)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Escape) {
+                    if (InputPolicy.isQuickRestart(root.activeSettings.behavior.quickRestart, "escape")) root.restart()
+                    else root.dismiss()
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Tab) {
+                    if (InputPolicy.isQuickRestart(root.activeSettings.behavior.quickRestart, "tab")) root.restart()
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+                    if (root.result || InputPolicy.isQuickRestart(root.activeSettings.behavior.quickRestart, "enter")) root.restart()
+                    else if (InputPolicy.shouldQuickEnd(root.activeSettings.test.mode, root.activeSettings.behavior.quickEnd, root.typing.startedAt !== null)) root.finishTest()
+                    event.accepted = true
+                    return
+                }
+                if (root.result) {
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Backspace) {
+                    var backspaceAction = InputPolicy.decide(root.typing, "Backspace", root.activeSettings.behavior)
+                    if (backspaceAction === "backspace") TypingState.backspace(root.typing)
+                    root.typing = Object.assign({}, root.typing)
+                    event.accepted = true
+                    return
+                }
+                if (root.isPrintable(event.text) && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+                    if (root.activeSettings.test.mode === "time" && root.typing.target.length - root.typing.cursor < 240) root.appendTimeWords()
+                    var inputAction = InputPolicy.decide(root.typing, event.text, root.activeSettings.behavior)
+                    if (inputAction === "blocked-error") TypingState.blockError(root.typing, event.text, Date.now())
+                    else if (inputAction === "input") TypingState.input(root.typing, event.text, Date.now())
+                    root.typing = Object.assign({}, root.typing)
+                    root.nowMs = Date.now()
+                    event.accepted = true
+                    if (root.typing.completed && root.activeSettings.test.mode === "words") root.finishTest()
+                }
+            }
+
+            Item {
+                id: content
+                x: Math.round(surface.width * 0.10)
+                width: Math.round(surface.width * 0.80)
+                height: surface.height
+
+                Item {
+                    id: header
+                    y: 52
+                    width: parent.width
+                    height: 48
+                    opacity: root.focusMode && root.runtimeSettings.appearance.focusHideHeader ? 0.12 : 1
+                    Behavior on opacity { NumberAnimation { duration: root.runtimeSettings.accessibility.reducedMotion ? 0 : 150 } }
+
+                    Text {
+                        id: logoIcon
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "󰌌"
+                        color: root.accentColor
+                        font.family: "JetBrainsMono Nerd Font"
+                        font.pixelSize: 31
+                    }
+                    Text {
+                        anchors.left: logoIcon.right
+                        anchors.leftMargin: 9
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "omatype"
+                        color: root.textColor
+                        font.family: root.typeface
+                        font.pixelSize: 30
+                        font.weight: Font.DemiBold
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "offline"
+                        color: root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 13
+                    }
+                }
+
+                Row {
+                    id: setup
+                    y: 135
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 12
+                    visible: (!root.focusMode || !root.runtimeSettings.appearance.focusHideSetup) && !root.result && !root.settingsOpen && !root.languagePanelOpen
+
+                    Rectangle {
+                        width: languageControl.implicitWidth + 28
+                        height: 41
+                        radius: 8
+                        color: root.controlColor
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Choose typing language"
+                        Accessible.onPressAction: root.openLanguagePanel()
+                        Text {
+                            id: languageControl
+                            anchors.centerIn: parent
+                            text: "󰖟  " + root.currentLanguagePack.label
+                            color: root.accentColor
+                            font.family: "JetBrainsMono Nerd Font"
+                            font.pixelSize: 13
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.openLanguagePanel()
+                        }
+                    }
+
+                    Rectangle {
+                        width: setupLeft.implicitWidth + 28
+                        height: 41
+                        radius: 8
+                        color: root.controlColor
+                        Row {
+                            id: setupLeft
+                            anchors.centerIn: parent
+                            spacing: 18
+                            Text {
+                                text: "@ punctuation"
+                                color: root.programmingLanguage ? Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.35) : (root.punctuation ? root.accentColor : root.mutedColor)
+                                font.family: root.typeface
+                                font.pixelSize: 13
+                                MouseArea { enabled: !root.programmingLanguage; anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.applySetting("test", "punctuation", !root.punctuation) }
+                            }
+                            Text {
+                                text: "# numbers"
+                                color: root.programmingLanguage ? Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.35) : (root.numbers ? root.accentColor : root.mutedColor)
+                                font.family: root.typeface
+                                font.pixelSize: 13
+                                MouseArea { enabled: !root.programmingLanguage; anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.applySetting("test", "numbers", !root.numbers) }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: setupModes.implicitWidth + 30
+                        height: 41
+                        radius: 8
+                        color: root.controlColor
+                        Row {
+                            id: setupModes
+                            anchors.centerIn: parent
+                            spacing: 18
+                            Repeater {
+                                model: ["time", "words"]
+                                delegate: Text {
+                                    required property string modelData
+                                    text: modelData
+                                    color: root.mode === modelData ? root.accentColor : root.mutedColor
+                                    font.family: root.typeface
+                                    font.pixelSize: 13
+                                    MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.chooseMode(parent.modelData) }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: setupAmounts.implicitWidth + 28
+                        height: 41
+                        radius: 8
+                        color: root.controlColor
+                        Row {
+                            id: setupAmounts
+                            anchors.centerIn: parent
+                            spacing: 15
+                            Repeater {
+                                model: root.mode === "time" ? root.timeOptions : root.wordOptions
+                                delegate: Text {
+                                    required property int modelData
+                                    text: modelData
+                                    color: root.amount === modelData ? root.accentColor : root.mutedColor
+                                    font.family: root.typeface
+                                    font.pixelSize: 13
+                                    MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.chooseAmount(parent.modelData) }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: languagePanel
+                    z: 11
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 116
+                    width: Math.min(parent.width, 1050)
+                    height: Math.min(500, surface.height - 220)
+                    visible: root.languagePanelOpen
+                    radius: 14
+                    color: root.controlColor
+                    border.width: 1
+                    border.color: Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.35)
+
+                    Text {
+                        x: 28
+                        y: 20
+                        text: "typing language"
+                        color: root.textColor
+                        font.family: root.typeface
+                        font.pixelSize: 24
+                        font.weight: Font.DemiBold
+                    }
+                    Text {
+                        x: 28
+                        y: 52
+                        text: "English + 36 original programming vocabularies"
+                        color: root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 12
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 28
+                        y: 27
+                        text: "esc  cancel"
+                        color: root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 12
+                        MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: root.languagePanelOpen = false }
+                    }
+
+                    GridView {
+                        id: languageGrid
+                        x: 24
+                        y: 82
+                        width: parent.width - 48
+                        height: parent.height - 102
+                        clip: true
+                        cellWidth: Math.floor(width / 6)
+                        cellHeight: 48
+                        model: root.languageOptions
+                        delegate: Rectangle {
+                            required property int index
+                            required property var modelData
+                            width: languageGrid.cellWidth - 8
+                            height: 40
+                            radius: 7
+                            color: root.language === modelData.id
+                                ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.18)
+                                : Qt.rgba(root.backgroundColor.r, root.backgroundColor.g, root.backgroundColor.b, 0.32)
+                            border.width: root.language === modelData.id || languageGrid.currentIndex === index ? 1 : 0
+                            border.color: languageGrid.currentIndex === index ? root.textColor : root.accentColor
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Language " + modelData.label
+                            Accessible.focused: languageGrid.currentIndex === index
+                            Accessible.onPressAction: root.chooseLanguage(modelData.id)
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.label
+                                color: root.language === modelData.id ? root.accentColor : root.textColor
+                                font.family: root.typeface
+                                font.pixelSize: 13
+                                font.weight: root.language === modelData.id ? Font.DemiBold : Font.Normal
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.chooseLanguage(parent.modelData.id)
+                            }
+                        }
+                    }
+                }
+
+                SettingsUi.SettingsDrawer {
+                    id: settingsPanel
+                    z: 10
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 90
+                    width: Math.min(parent.width, 1040)
+                    height: Math.min(660, surface.height - 140)
+                    visible: root.settingsOpen
+                    settings: root.userSettings
+                    backgroundColor: root.backgroundColor
+                    panelColor: root.controlColor
+                    accentColor: root.accentColor
+                    textColor: root.textColor
+                    mutedColor: root.mutedColor
+                    fontFamily: root.typeface
+                    onSettingChanged: function(category, key, value) {
+                        root.applySetting(category, key, value)
+                    }
+                    onCategoryReset: function(category) {
+                        root.resetSettingsCategory(category)
+                    }
+                    onCloseRequested: root.settingsOpen = false
+                }
+
+                Item {
+                    id: testView
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: Math.round(surface.height * 0.39)
+                    width: Math.min(parent.width, root.runtimeSettings.appearance.maxLineWidth)
+                    height: root.runtimeSettings.appearance.lineCount * root.runtimeSettings.appearance.lineHeight
+                    visible: !root.result && !root.settingsOpen && !root.languagePanelOpen
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: -30
+                        visible: !root.focusMode
+                        text: "󰖟  " + root.activeLanguagePack.label
+                        color: root.mutedColor
+                        font.family: "JetBrainsMono Nerd Font"
+                        font.pixelSize: 13
+                    }
+
+                    Text {
+                        x: 0
+                        y: -34
+                        visible: root.focusMode && root.activeSettings.test.mode === "time"
+                            && root.runtimeSettings.appearance.timerStyle !== "off"
+                            && root.runtimeSettings.appearance.timerStyle !== "bar"
+                        text: root.remainingSeconds
+                        color: root.accentColor
+                        font.family: root.typeface
+                        font.pixelSize: root.runtimeSettings.appearance.timerStyle === "mini" ? 14 : 24
+                    }
+
+                    Rectangle {
+                        x: 0
+                        y: -18
+                        width: parent.width
+                        height: 3
+                        visible: root.focusMode && root.activeSettings.test.mode === "time" && root.runtimeSettings.appearance.timerStyle === "bar"
+                        color: Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.24)
+                        Rectangle {
+                            width: parent.width * Math.max(0, Math.min(1, root.remainingSeconds / Math.max(1, root.activeSettings.test.time)))
+                            height: parent.height
+                            color: root.accentColor
+                            Behavior on width { NumberAnimation { duration: root.runtimeSettings.accessibility.reducedMotion ? 0 : 180 } }
+                        }
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        y: -34
+                        spacing: 16
+                        visible: root.focusMode && (root.runtimeSettings.appearance.liveWpm || root.runtimeSettings.appearance.liveAccuracy)
+                        Text {
+                            visible: root.runtimeSettings.appearance.liveWpm
+                            text: Math.round(root.liveMetrics.wpm) + " wpm"
+                            color: root.textColor
+                            font.family: root.typeface
+                            font.pixelSize: 13
+                        }
+                        Text {
+                            visible: root.runtimeSettings.appearance.liveAccuracy
+                            text: root.liveMetrics.accuracy.toFixed(0) + "% acc"
+                            color: root.textColor
+                            font.family: root.typeface
+                            font.pixelSize: 13
+                        }
+                    }
+
+                    Item {
+                        id: wordsClip
+                        anchors.fill: parent
+                        clip: true
+                        onWidthChanged: root.rebuildWordLayout(width)
+
+                        Item {
+                            id: typingFlow
+                            width: parent.width
+                            y: -Math.max(0, root.activeWordY - root.runtimeSettings.appearance.lineHeight)
+                            Behavior on y {
+                                enabled: root.runtimeSettings.appearance.smoothScroll && !root.runtimeSettings.accessibility.reducedMotion
+                                NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+                            }
+
+                            Repeater {
+                                id: wordRepeater
+                                model: root.generated ? root.generated.words : []
+                                delegate: Item {
+                                    id: wordDelegate
+                                    required property int index
+                                    required property string modelData
+                                    readonly property string word: modelData
+                                    readonly property int globalStart: root.globalStartForWord(index)
+                                    readonly property var geometry: root.wordLayout[index] || ({x: 0, y: 0, width: word.length * root.characterWidth + root.runtimeSettings.appearance.wordSpacing})
+                                    x: geometry.x
+                                    y: geometry.y
+                                    width: geometry.width
+                                    height: root.runtimeSettings.appearance.lineHeight
+
+                                    Repeater {
+                                        model: wordDelegate.word.length
+                                        delegate: Text {
+                                            required property int index
+                                            x: index * root.characterWidth
+                                            y: 0
+                                            text: wordDelegate.word.charAt(index)
+                                            color: {
+                                                var globalIndex = wordDelegate.globalStart + index
+                                                var typed = root.typing && globalIndex < root.typing.cursor
+                                                var status = typed ? root.typing.status[globalIndex] : ""
+                                                if (status === "error") {
+                                                    var errorStyle = root.runtimeSettings.accessibility.errorStyle
+                                                    return errorStyle === "color" || errorStyle === "both" ? root.errorColor : root.textColor
+                                                }
+                                                if (typed) {
+                                                    var typedEffect = root.runtimeSettings.appearance.typedEffect
+                                                    if (typedEffect === "hide") return Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0)
+                                                    if (typedEffect === "fade") return root.mutedColor
+                                                    return root.textColor
+                                                }
+                                                var highlight = root.runtimeSettings.appearance.highlight
+                                                if (highlight === "letter" && globalIndex === root.typing.cursor) return root.accentColor
+                                                if (highlight === "word" && wordDelegate.index === root.activeWordIndex) return root.textColor
+                                                if (highlight === "next-word" && wordDelegate.index === root.activeWordIndex + 1) return root.textColor
+                                                return root.mutedColor
+                                            }
+                                            font.family: root.typeface
+                                            font.pixelSize: root.runtimeSettings.appearance.fontSize
+                                            font.weight: Font.Medium
+                                            font.underline: {
+                                                if (!root.typing) return false
+                                                var globalIndex = wordDelegate.globalStart + index
+                                                var isError = globalIndex < root.typing.cursor && root.typing.status[globalIndex] === "error"
+                                                var errorStyle = root.runtimeSettings.accessibility.errorStyle
+                                                return isError && (errorStyle === "underline" || errorStyle === "both")
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        id: caret
+                                        readonly property string style: root.runtimeSettings.caret.style
+                                        visible: root.activeWordIndex === wordDelegate.index && !root.result && style !== "off"
+                                        x: Math.min(wordDelegate.word.length, Math.max(0, root.typing ? root.typing.cursor - wordDelegate.globalStart : 0)) * root.characterWidth - 1
+                                        y: style === "underline" ? root.runtimeSettings.appearance.fontSize + 3 : Math.max(1, (root.runtimeSettings.appearance.lineHeight - root.runtimeSettings.appearance.fontSize) / 2)
+                                        width: style === "default" ? root.runtimeSettings.caret.thickness : root.characterWidth
+                                        height: style === "underline" ? root.runtimeSettings.caret.thickness : root.runtimeSettings.appearance.fontSize
+                                        radius: style === "default" || style === "underline" ? 1 : 2
+                                        color: style === "outline" ? "transparent" : root.caretColor
+                                        opacity: style === "block" ? 0.3 : 1
+                                        border.width: style === "outline" ? root.runtimeSettings.caret.thickness : 0
+                                        border.color: root.caretColor
+                                        Behavior on x {
+                                            enabled: root.caretSmoothDuration > 0
+                                            NumberAnimation { duration: root.caretSmoothDuration; easing.type: Easing.OutCubic }
+                                        }
+                                        SequentialAnimation on opacity {
+                                            running: caret.visible && root.runtimeSettings.caret.blink && !root.focusMode && !root.runtimeSettings.accessibility.reducedMotion
+                                            loops: Animation.Infinite
+                                            NumberAnimation { to: 0.12; duration: Math.round(root.runtimeSettings.caret.blinkMs / 2) }
+                                            NumberAnimation { to: caret.style === "block" ? 0.3 : 1; duration: Math.round(root.runtimeSettings.caret.blinkMs / 2) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: testView.height + 52
+                        visible: !root.focusMode
+                        text: "↻"
+                        color: restartMouse.containsMouse ? root.textColor : root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 25
+                        MouseArea {
+                            id: restartMouse
+                            anchors.fill: parent
+                            anchors.margins: -10
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.restart()
+                        }
+                    }
+                }
+
+                Item {
+                    id: results
+                    x: 0
+                    y: Math.round(surface.height * 0.25)
+                    width: parent.width
+                    height: 360
+                    visible: !!root.result && !root.settingsOpen && !root.languagePanelOpen
+
+                    Row {
+                        anchors.fill: parent
+                        spacing: 42
+
+                        Column {
+                            width: 132
+                            spacing: 0
+                            Text { text: "wpm"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 28 }
+                            Text { text: root.result ? Math.round(root.result.wpm) : ""; color: root.accentColor; font.family: root.typeface; font.pixelSize: 64 }
+                            Item { width: 1; height: 10 }
+                            Text { text: "acc"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 28 }
+                            Text { text: root.result ? root.result.accuracy.toFixed(0) + "%" : ""; color: root.accentColor; font.family: root.typeface; font.pixelSize: 54 }
+                        }
+
+                        Canvas {
+                            id: resultChart
+                            width: Math.max(300, results.width - 420)
+                            height: 230
+                            onVisibleChanged: if (visible) requestPaint()
+                            onPaint: {
+                                var ctx = getContext("2d")
+                                ctx.clearRect(0, 0, width, height)
+                                ctx.strokeStyle = root.mutedColor
+                                ctx.globalAlpha = 0.35
+                                ctx.lineWidth = 1
+                                for (var line = 1; line <= 4; ++line) {
+                                    var gy = line * height / 5
+                                    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(width, gy); ctx.stroke()
+                                }
+                                ctx.globalAlpha = 1
+                                var points = root.samples
+                                if (!points || points.length === 0) return
+                                var maximum = 10
+                                for (var i = 0; i < points.length; ++i) maximum = Math.max(maximum, Number(points[i]) || 0)
+                                ctx.strokeStyle = root.accentColor
+                                ctx.lineWidth = 3
+                                ctx.beginPath()
+                                for (var p = 0; p < points.length; ++p) {
+                                    var px = points.length === 1 ? width / 2 : p * width / (points.length - 1)
+                                    var py = height - 18 - ((Number(points[p]) || 0) / maximum) * (height - 36)
+                                    if (p === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+                                }
+                                ctx.stroke()
+                            }
+                        }
+
+                        Column {
+                            width: 190
+                            spacing: 2
+                            Text { text: "test type"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 13 }
+                            Text { text: root.activeSettings.test.mode + " " + root.activeAmount + "\n" + root.activeLanguagePack.label; color: root.textColor; font.family: root.typeface; font.pixelSize: 16 }
+                            Item { width: 1; height: 10 }
+                            Text { text: "raw"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 13 }
+                            Text { text: root.result ? root.result.rawWpm.toFixed(0) : ""; color: root.textColor; font.family: root.typeface; font.pixelSize: 16 }
+                            Item { width: 1; height: 10 }
+                            Text { text: "characters"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 13 }
+                            Text {
+                                text: root.result ? root.result.correct + "/" + root.result.errors + "/0/0" : ""
+                                color: root.textColor
+                                font.family: root.typeface
+                                font.pixelSize: 16
+                            }
+                            Item { width: 1; height: 10 }
+                            Text { text: "consistency"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 13 }
+                            Text { text: root.result ? root.result.consistency.toFixed(0) + "%" : ""; color: root.textColor; font.family: root.typeface; font.pixelSize: 16 }
+                        }
+                    }
+                }
+
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: surface.height - 108
+                    spacing: 25
+                    visible: (!root.focusMode || !root.runtimeSettings.appearance.focusHideFooter) && !root.languagePanelOpen
+                    Text { text: "tab  restart"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text { visible: !!root.result; text: "enter  next"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text { text: "esc  close"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text {
+                        text: "ctrl+,  settings"
+                        color: root.settingsOpen ? root.accentColor : root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 12
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Open settings"
+                        Accessible.onPressAction: root.settingsOpen = true
+                        MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.settingsOpen = !root.settingsOpen }
+                    }
+                    Text { text: "ctrl+l  language"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: surface.height - 77
+                    visible: root.settingsOpen && !root.focusMode
+                    text: "seed  " + root.seed + "    history  " + historyAdapter.entries.length + "/100    local only"
+                    color: root.mutedColor
+                    font.family: root.typeface
+                    font.pixelSize: 11
+                }
+            }
+        }
+    }
+}

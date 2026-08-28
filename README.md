@@ -1,0 +1,83 @@
+# OmaType
+
+OmaType (`jobo.omatype`) is an original MIT-licensed, offline typing-practice plugin for Omarchy. It takes visual cues from the calm, distraction-free category of typing trainers without copying Monkeytype code, word data, or assets.
+
+## Features
+
+- Responsive full-screen overlay using the active Omarchy background, foreground, accent, muted, urgent, and typography tokens.
+- Time tests: 15, 30, 60, or 120 seconds.
+- Word tests: 10, 25, 50, or 100 words.
+- Optional punctuation and numbers.
+- Seeded deterministic generation from an original 229-word English list.
+- A local picker with English plus 36 programming-language vocabularies, including Nix, Bash, Python, Rust, JavaScript, TypeScript, C/C++, Go, SQL, Zig, and more.
+- Programming packs use original OmaType-curated keywords, operators, syntax terms, and common API identifiers; they do not copy Monkeytype dictionaries.
+- Correct/error character state with monotonic keystroke, mistake, correction, and corrected-error telemetry; backspace repairs the display without erasing historical effort.
+- WPM, raw WPM, accuracy, and consistency metrics plus a chart of discrete one-second interval speed.
+- A compact bar widget showing the latest local result.
+- Normalized, newest-first local history capped at 100 tests.
+- A componentized five-section settings drawer for test defaults, input behavior, timer/live metrics, typography and line geometry, highlighting and typed-text effects, caret presentation, focus mode, reduced motion, contrast, and error indicators.
+- Versioned, fail-closed preferences stored separately from history at `~/.config/omarchy/omatype-settings.json`; behavior and test preferences are snapshotted when a new test starts.
+
+No account, telemetry, network request, copied Monkeytype source, or copied Monkeytype asset is used. History is local to `~/.local/state/omarchy/omatype-history.json`.
+
+## Layout
+
+- `manifest.json` — Quattro schema-v1 plugin manifest.
+- `OmaType.qml` — full-screen overlay entry point.
+- `BarWidget.qml` — bar widget entry point.
+- `src/` — deterministic generator, typing state, metrics, session composition, history normalization, settings, centered layout, and the offline language-pack registry.
+- `data/words-en.json` — original project word list.
+- `tests/` — Node built-in tests and QML contract checks.
+
+## Installation
+
+Install this repository through Quattro's local-plugin workflow using the repository root. For a development checkout:
+
+```sh
+mkdir -p ~/.config/omarchy/plugins
+ln -s /absolute/path/to/omatype ~/.config/omarchy/plugins/jobo.omatype
+omarchy plugin validate ~/.config/omarchy/plugins/jobo.omatype
+omarchy plugin enable jobo.omatype right
+omarchy-restart-shell
+```
+
+The manifest declares both entry points:
+
+- overlay: `OmaType.qml`
+- bar widget: `BarWidget.qml`
+
+`OmaType.qml` owns the full-screen `PanelWindow` and exclusive typing focus. Quattro keeps the plugin instance alive and invokes its `open(payloadJson)` and `close()` functions. `BarWidget.qml` uses the supported `BarIconButton` contract and calls `bar.run(...)` to toggle `jobo.omatype` through `omarchy-shell`.
+
+Open it directly with:
+
+```sh
+omarchy-shell shell toggle jobo.omatype '{}'
+```
+
+## Controls
+
+- Type any printable character to begin.
+- **Backspace** repairs the previous character.
+- **Tab** creates a fresh test and seed by default; the quick-restart key can be changed to Escape or Enter.
+- **Enter** starts the next test from results and can optionally end an active test early.
+- **Escape** closes the settings/language panel first, then closes the overlay unless assigned as quick restart.
+- **Ctrl+,** opens or closes Test, Behavior, Display, Caret, and Access settings. Within settings, Tab/Shift+Tab moves between rows; Left/Right changes sections or values; Enter/Space selects; R resets the section; Page Up/Page Down scrolls.
+- **Ctrl+L** opens or closes the language picker. Use arrows or Tab/Shift+Tab to move, Enter/Space to select, and Escape to close.
+- Pointer users can also click **settings**, the language control, setup options, and independent section reset controls.
+- Programming vocabularies keep their syntax tokens intact, so the English punctuation/number transformations are disabled while one is selected.
+
+## Development and validation
+
+Requires Node.js 20 or newer; there are no npm dependencies.
+
+```sh
+tests/run
+node -e 'for (const f of ["manifest.json", "data/words-en.json"]) JSON.parse(require("node:fs").readFileSync(f))'
+git diff --check
+```
+
+QML runtime validation requires Qt 6, Quickshell, and the Quattro plugin host. Contract tests intentionally keep deterministic business logic testable without a compositor.
+
+## License
+
+MIT. See `LICENSE`.

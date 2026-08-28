@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "jobo.omatype",
+  "name": "OmaType",
+  "description": "A native, offline typing test for Omarchy.",
+  "version": "0.1.0",
+  "author": "jobo",
+  "license": "MIT",
+  "kinds": [
+    "overlay",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "OmaType.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "OmaType",
+    "description": "Open a typing test and show the latest WPM",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

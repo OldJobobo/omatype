@@ -1,0 +1,5 @@
+const test=require("node:test"); const assert=require("node:assert/strict"); const fs=require("node:fs"); const path=require("node:path"); const read=n=>fs.readFileSync(path.join(__dirname,"..",n),"utf8");
+test("release documentation covers install, controls, privacy, validation, and license",()=>{ const readme=read("README.md"); for(const token of ["jobo.omatype","OmaType.qml","BarWidget.qml","tests/run","offline","local","Tab","Escape","MIT"])assert.match(readme,new RegExp(token,"i")); assert.match(read("LICENSE"),/MIT License/); assert.match(read("CHANGELOG.md"),/0\.1\.0/); });
+
+test("README reports the exact original corpus size",()=>{ const words=JSON.parse(read("data/words-en.json")); assert.equal(new Set(words).size,words.length); assert.match(read("README.md"),new RegExp(`original ${words.length}-word`)); });
+test("README documents the actual Quattro lifecycle contracts",()=>{ const readme=read("README.md"); for(const token of ["PanelWindow","open(payloadJson)","close()","bar.run"])assert.ok(readme.includes(token),token); assert.doesNotMatch(readme,/closeRequested\(\)|activated\(\)/); });
