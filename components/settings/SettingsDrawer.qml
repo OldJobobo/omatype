@@ -26,10 +26,15 @@ Rectangle {
     readonly property var caretSettings: settings.caret || ({})
     readonly property var accessibilitySettings: settings.accessibility || ({})
 
+    function openSection(index) {
+        var bounded = Math.max(0, Math.min(root.sections.length - 1, index))
+        root.currentSection = root.sections[bounded]
+        Qt.callLater(function() { root.focusFirstRow() })
+    }
+
     function moveSection(delta) {
         var index = root.sections.indexOf(root.currentSection)
-        var next = Math.max(0, Math.min(root.sections.length - 1, index + delta))
-        root.currentSection = root.sections[next]
+        root.openSection(index + delta)
     }
 
     function scrollBy(delta) {
@@ -42,6 +47,20 @@ Rectangle {
         var total = 0
         for (var i = 0; i < column.children.length; ++i) total += column.children[i].height
         return total + Math.max(0, column.children.length - 1) * column.spacing
+    }
+
+    function focusFirstRow() {
+        root.focusBoundary(false)
+    }
+
+    function focusBoundary(last) {
+        var rows = scroller.activeColumn ? scroller.activeColumn.children : []
+        if (!rows || rows.length === 0) return
+        root.focusedRowIndex = last ? rows.length - 1 : 0
+        var row = rows[root.focusedRowIndex]
+        if (row && typeof row.forceActiveFocus === "function") row.forceActiveFocus()
+        if (last) scroller.contentY = Math.max(0, scroller.contentHeight - scroller.height)
+        else scroller.contentY = 0
     }
 
     function focusRow(delta) {
@@ -76,6 +95,7 @@ Rectangle {
     onCurrentSectionChanged: {
         scroller.contentY = 0
         root.focusedRowIndex = -1
+        Qt.callLater(function() { root.focusFirstRow() })
     }
 
     radius: 14
@@ -91,6 +111,14 @@ Rectangle {
         font.family: root.fontFamily
         font.pixelSize: 24
         font.weight: Font.DemiBold
+    }
+    Text {
+        x: 176
+        y: 28
+        text: "ctrl+1–5 section   tab/↑/↓ row   ←/→ value   r reset   esc done"
+        color: root.mutedColor
+        font.family: root.fontFamily
+        font.pixelSize: 10
     }
     Text {
         anchors.right: parent.right

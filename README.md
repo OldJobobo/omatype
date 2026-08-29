@@ -54,16 +54,19 @@ Open it directly with:
 omarchy-shell shell toggle jobo.omatype '{}'
 ```
 
+For pointer-free launch, assign that command to any collision-free global shortcut in the host's normal Omarchy/Hyprland keybinding configuration. OmaType deliberately does not claim a system-wide key during plugin installation; use Omarchy's keybinding list to choose one that does not replace an existing host action.
+
 ## Controls
 
 - Type any printable character to begin.
 - **Backspace** repairs the previous character.
-- **Tab** creates a fresh test and seed by default; the quick-restart key can be changed to Escape or Enter.
+- **Ctrl+R** always creates a fresh test and seed. The configurable quick-restart key can additionally use Tab, Escape, Enter, or be disabled.
+- **Ctrl+Escape** always closes OmaType, even when Escape is assigned to quick restart. Plain **Escape** closes an open panel first; otherwise it follows the configured quick-restart behavior or closes the overlay.
 - **Enter** starts the next test from results and can optionally end an active test early.
-- **Escape** closes the settings/language panel first, then closes the overlay unless assigned as quick restart.
-- **Ctrl+,** opens or closes Test, Behavior, Display, Caret, and Access settings. Within settings, Tab/Shift+Tab moves between rows; Left/Right changes sections or values; Enter/Space selects; R resets the section; Page Up/Page Down scrolls.
-- **Ctrl+L** opens or closes the language picker. Use arrows or Tab/Shift+Tab to move, Enter/Space to select, and Escape to close.
-- Pointer users can also click **settings**, the language control, setup options, and independent section reset controls.
+- **Ctrl+M** switches between time and word modes. **Ctrl+Up/Down** cycles the available test lengths. **Ctrl+P** and **Ctrl+N** toggle punctuation and numbers for future English tests.
+- **Ctrl+,** opens or closes Test, Behavior, Display, Caret, and Access settings. The drawer focuses its first row immediately. Use **Ctrl+1** through **Ctrl+5** or **Ctrl+Left/Right** to change sections, and **Tab/Shift+Tab** or **Up/Down** to move through rows. Left/Right changes the focused value; **Enter/Space** advances it; **Home/End** jumps to the first/last row; **Page Up/Page Down** scrolls; **R** resets the current section; and **Escape** closes settings.
+- **Ctrl+L** opens or closes the language picker. Use arrows or Tab/Shift+Tab to move, Home/End to jump, Page Up/Page Down to move by three rows, Enter/Space to select, and Escape to close.
+- Every setup choice and settings value has a keyboard-only path. Pointer and accessibility actions invoke the same bounded operations.
 - Programming vocabularies keep their syntax tokens intact, so the English punctuation/number transformations are disabled while one is selected.
 
 ## Development and validation

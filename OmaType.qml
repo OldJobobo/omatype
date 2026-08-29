@@ -188,6 +188,23 @@ Item {
         return root.activeLanguage === "english" ? WordList.words : root.activeLanguagePack.words
     }
 
+    function openSettingsPanel(section) {
+        root.languagePanelOpen = false
+        root.settingsOpen = true
+        var index = root.settingsSections.indexOf(section)
+        if (index < 0) index = root.settingsSections.indexOf(settingsPanel.currentSection)
+        if (index < 0) index = 0
+        Qt.callLater(function() {
+            settingsPanel.openSection(index)
+            settingsPanel.focusFirstRow()
+        })
+    }
+
+    function closeSettingsPanel() {
+        root.settingsOpen = false
+        Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+    }
+
     function openLanguagePanel() {
         root.settingsOpen = false
         root.languagePanelOpen = true
@@ -196,6 +213,12 @@ Item {
             if (root.languageOptions[i].id === root.language) { current = i; break }
         }
         languageGrid.currentIndex = current >= 0 ? current : 0
+        Qt.callLater(function() { languageGrid.forceActiveFocus() })
+    }
+
+    function closeLanguagePanel() {
+        root.languagePanelOpen = false
+        Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
     }
 
     function chooseLanguage(languageId) {
@@ -204,7 +227,7 @@ Item {
         root.language = languageId
         root.userSettings = Settings.update(root.userSettings, "test", "language", languageId)
         root.persistSettings()
-        root.languagePanelOpen = false
+        root.closeLanguagePanel()
         if (!activeRun) root.restart()
         else Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
     }
@@ -340,6 +363,14 @@ Item {
 
     function chooseAmount(value) {
         root.applySetting("test", root.mode === "time" ? "time" : "words", value)
+    }
+
+    function cycleAmount(delta) {
+        var options = root.mode === "time" ? root.timeOptions : root.wordOptions
+        var index = options.indexOf(root.amount)
+        if (index < 0) index = 0
+        var next = (index + delta + options.length) % options.length
+        root.chooseAmount(options[next])
     }
 
     function globalStartForWord(wordIndex) {
@@ -496,26 +527,44 @@ Item {
             anchors.fill: parent
             focus: true
 
+            Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
-                if (event.key === Qt.Key_Comma && (event.modifiers & Qt.ControlModifier)) {
-                    root.languagePanelOpen = false
-                    root.settingsOpen = !root.settingsOpen
+                var controlHeld = (event.modifiers & Qt.ControlModifier) !== 0
+                if (event.key === Qt.Key_Escape && (event.modifiers & Qt.ControlModifier)) {
+                    root.dismiss()
                     event.accepted = true
                     return
                 }
-                if (event.key === Qt.Key_L && (event.modifiers & Qt.ControlModifier)) {
-                    if (root.languagePanelOpen) root.languagePanelOpen = false
+                if (event.key === Qt.Key_R && (event.modifiers & Qt.ControlModifier)) {
+                    root.settingsOpen = false
+                    root.languagePanelOpen = false
+                    root.restart()
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Comma && controlHeld) {
+                    if (root.settingsOpen) root.closeSettingsPanel()
+                    else root.openSettingsPanel(settingsPanel.currentSection)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_L && controlHeld) {
+                    if (root.languagePanelOpen) root.closeLanguagePanel()
                     else root.openLanguagePanel()
                     event.accepted = true
                     return
                 }
                 if (root.languagePanelOpen) {
                     var nextLanguage = languageGrid.currentIndex < 0 ? 0 : languageGrid.currentIndex
-                    if (event.key === Qt.Key_Escape) root.languagePanelOpen = false
+                    if (event.key === Qt.Key_Escape) root.closeLanguagePanel()
+                    else if (event.key === Qt.Key_Home) { languageGrid.currentIndex = 0; nextLanguage = 0 }
+                    else if (event.key === Qt.Key_End) { languageGrid.currentIndex = root.languageOptions.length - 1; nextLanguage = languageGrid.currentIndex }
                     else if (event.key === Qt.Key_Left) nextLanguage -= 1
                     else if (event.key === Qt.Key_Right) nextLanguage += 1
                     else if (event.key === Qt.Key_Up) nextLanguage -= 6
                     else if (event.key === Qt.Key_Down) nextLanguage += 6
+                    else if (event.key === Qt.Key_PageUp) nextLanguage -= 18
+                    else if (event.key === Qt.Key_PageDown) nextLanguage += 18
                     else if (event.key === Qt.Key_Tab) nextLanguage += (event.modifiers & Qt.ShiftModifier) ? -1 : 1
                     else if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return || event.key === Qt.Key_Space) {
                         if (languageGrid.currentIndex >= 0 && languageGrid.currentIndex < root.languageOptions.length)
@@ -527,14 +576,46 @@ Item {
                     return
                 }
                 if (root.settingsOpen) {
-                    if (event.key === Qt.Key_Escape) root.settingsOpen = false
+                    if (event.key === Qt.Key_Escape) root.closeSettingsPanel()
+                    else if (controlHeld && event.key >= Qt.Key_1 && event.key <= Qt.Key_5) settingsPanel.openSection(event.key - Qt.Key_1)
+                    else if (controlHeld && event.key === Qt.Key_Left) settingsPanel.moveSection(-1)
+                    else if (controlHeld && event.key === Qt.Key_Right) settingsPanel.moveSection(1)
                     else if (event.key === Qt.Key_Tab) settingsPanel.focusRow(event.modifiers & Qt.ShiftModifier ? -1 : 1)
+                    else if (event.key === Qt.Key_Up) settingsPanel.focusRow(-1)
+                    else if (event.key === Qt.Key_Down) settingsPanel.focusRow(1)
+                    else if (event.key === Qt.Key_Left) settingsPanel.activateFocusedRow(-1)
+                    else if (event.key === Qt.Key_Right) settingsPanel.activateFocusedRow(1)
+                    else if (event.key === Qt.Key_Home) settingsPanel.focusBoundary(false)
+                    else if (event.key === Qt.Key_End) settingsPanel.focusBoundary(true)
+                    else if (event.key === Qt.Key_PageUp) settingsPanel.scrollBy(-220)
+                    else if (event.key === Qt.Key_PageDown) settingsPanel.scrollBy(220)
                     else if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return || event.key === Qt.Key_Space) settingsPanel.activateFocusedRow(1)
                     else if (event.key === Qt.Key_R) settingsPanel.resetCurrentSection()
-                    else if (event.key === Qt.Key_Left) settingsPanel.moveSection(-1)
-                    else if (event.key === Qt.Key_Right) settingsPanel.moveSection(1)
-                    else if (event.key === Qt.Key_Up || event.key === Qt.Key_PageUp) settingsPanel.scrollBy(-220)
-                    else if (event.key === Qt.Key_Down || event.key === Qt.Key_PageDown) settingsPanel.scrollBy(220)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_M && controlHeld) {
+                    root.chooseMode(root.mode === "time" ? "words" : "time")
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Up && controlHeld) {
+                    root.cycleAmount(-1)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Down && controlHeld) {
+                    root.cycleAmount(1)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_P && controlHeld) {
+                    root.applySetting("test", "punctuation", !root.punctuation)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_N && controlHeld) {
+                    root.applySetting("test", "numbers", !root.numbers)
                     event.accepted = true
                     return
                 }
@@ -550,8 +631,9 @@ Item {
                     return
                 }
                 if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
-                    if (root.result || InputPolicy.isQuickRestart(root.activeSettings.behavior.quickRestart, "enter")) root.restart()
+                    if (root.result) root.restart()
                     else if (InputPolicy.shouldQuickEnd(root.activeSettings.test.mode, root.activeSettings.behavior.quickEnd, root.typing.startedAt !== null)) root.finishTest()
+                    else if (InputPolicy.isQuickRestart(root.activeSettings.behavior.quickRestart, "enter")) root.restart()
                     event.accepted = true
                     return
                 }
@@ -657,6 +739,10 @@ Item {
                                 color: root.programmingLanguage ? Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.35) : (root.punctuation ? root.accentColor : root.mutedColor)
                                 font.family: root.typeface
                                 font.pixelSize: 13
+                                Accessible.role: Accessible.Button
+                                Accessible.name: "Toggle punctuation"
+                                Accessible.checked: root.punctuation
+                                Accessible.onPressAction: if (!root.programmingLanguage) root.applySetting("test", "punctuation", !root.punctuation)
                                 MouseArea { enabled: !root.programmingLanguage; anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.applySetting("test", "punctuation", !root.punctuation) }
                             }
                             Text {
@@ -664,6 +750,10 @@ Item {
                                 color: root.programmingLanguage ? Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.35) : (root.numbers ? root.accentColor : root.mutedColor)
                                 font.family: root.typeface
                                 font.pixelSize: 13
+                                Accessible.role: Accessible.Button
+                                Accessible.name: "Toggle numbers"
+                                Accessible.checked: root.numbers
+                                Accessible.onPressAction: if (!root.programmingLanguage) root.applySetting("test", "numbers", !root.numbers)
                                 MouseArea { enabled: !root.programmingLanguage; anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.applySetting("test", "numbers", !root.numbers) }
                             }
                         }
@@ -686,6 +776,10 @@ Item {
                                     color: root.mode === modelData ? root.accentColor : root.mutedColor
                                     font.family: root.typeface
                                     font.pixelSize: 13
+                                    Accessible.role: Accessible.RadioButton
+                                    Accessible.name: "Use " + modelData + " mode"
+                                    Accessible.checked: root.mode === modelData
+                                    Accessible.onPressAction: root.chooseMode(modelData)
                                     MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.chooseMode(parent.modelData) }
                                 }
                             }
@@ -709,11 +803,25 @@ Item {
                                     color: root.amount === modelData ? root.accentColor : root.mutedColor
                                     font.family: root.typeface
                                     font.pixelSize: 13
+                                    Accessible.role: Accessible.RadioButton
+                                    Accessible.name: "Use test length " + modelData
+                                    Accessible.checked: root.amount === modelData
+                                    Accessible.onPressAction: root.chooseAmount(modelData)
                                     MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.chooseAmount(parent.modelData) }
                                 }
                             }
                         }
                     }
+                }
+
+                Text {
+                    y: 188
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: setup.visible
+                    text: "ctrl+m mode   ctrl+↑/↓ length   ctrl+p punctuation   ctrl+n numbers"
+                    color: root.mutedColor
+                    font.family: root.typeface
+                    font.pixelSize: 10
                 }
 
                 Rectangle {
@@ -741,7 +849,7 @@ Item {
                     Text {
                         x: 28
                         y: 52
-                        text: "English + 36 original programming vocabularies"
+                        text: "arrows/tab move   home/end jump   page up/down   enter select   esc cancel"
                         color: root.mutedColor
                         font.family: root.typeface
                         font.pixelSize: 12
@@ -754,7 +862,10 @@ Item {
                         color: root.mutedColor
                         font.family: root.typeface
                         font.pixelSize: 12
-                        MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: root.languagePanelOpen = false }
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Close language picker"
+                        Accessible.onPressAction: root.closeLanguagePanel()
+                        MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: root.closeLanguagePanel() }
                     }
 
                     GridView {
@@ -767,6 +878,42 @@ Item {
                         cellWidth: Math.floor(width / 6)
                         cellHeight: 48
                         model: root.languageOptions
+                        focus: root.languagePanelOpen
+                        keyNavigationEnabled: false
+                        Keys.priority: Keys.BeforeItem
+                        Keys.onPressed: function(event) {
+                            if (event.key === Qt.Key_Escape) {
+                                if (event.modifiers & Qt.ControlModifier) root.dismiss()
+                                else root.closeLanguagePanel()
+                                event.accepted = true
+                                return
+                            }
+                            if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return || event.key === Qt.Key_Space) {
+                                if (languageGrid.currentIndex >= 0 && languageGrid.currentIndex < root.languageOptions.length)
+                                    root.chooseLanguage(root.languageOptions[languageGrid.currentIndex].id)
+                                event.accepted = true
+                                return
+                            }
+                            var nextLanguage = languageGrid.currentIndex < 0 ? 0 : languageGrid.currentIndex
+                            if (event.key === Qt.Key_Left) nextLanguage -= 1
+                            else if (event.key === Qt.Key_Right) nextLanguage += 1
+                            else if (event.key === Qt.Key_Up) nextLanguage -= 6
+                            else if (event.key === Qt.Key_Down) nextLanguage += 6
+                            else if (event.key === Qt.Key_Home) nextLanguage = 0
+                            else if (event.key === Qt.Key_End) nextLanguage = root.languageOptions.length - 1
+                            else if (event.key === Qt.Key_PageUp) nextLanguage -= 18
+                            else if (event.key === Qt.Key_PageDown) nextLanguage += 18
+                            else if (event.key === Qt.Key_Tab) {
+                                var delta = (event.modifiers & Qt.ShiftModifier) ? -1 : 1
+                                var count = root.languageOptions.length
+                                nextLanguage = (nextLanguage + delta + count) % count
+                            } else {
+                                return
+                            }
+                            languageGrid.currentIndex = Math.max(0, Math.min(root.languageOptions.length - 1, nextLanguage))
+                            languageGrid.positionViewAtIndex(languageGrid.currentIndex, GridView.Contain)
+                            event.accepted = true
+                        }
                         delegate: Rectangle {
                             required property int index
                             required property var modelData
@@ -820,7 +967,7 @@ Item {
                     onCategoryReset: function(category) {
                         root.resetSettingsCategory(category)
                     }
-                    onCloseRequested: root.settingsOpen = false
+                    onCloseRequested: root.closeSettingsPanel()
                 }
 
                 Item {
@@ -996,6 +1143,10 @@ Item {
                         color: restartMouse.containsMouse ? root.textColor : root.mutedColor
                         font.family: root.typeface
                         font.pixelSize: 25
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Restart typing test"
+                        Accessible.description: "Ctrl+R"
+                        Accessible.onPressAction: root.restart()
                         MouseArea {
                             id: restartMouse
                             anchors.fill: parent
@@ -1089,9 +1240,9 @@ Item {
                     y: surface.height - 108
                     spacing: 25
                     visible: (!root.focusMode || !root.runtimeSettings.appearance.focusHideFooter) && !root.languagePanelOpen
-                    Text { text: "tab  restart"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text { text: "ctrl+r  restart"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text { visible: !!root.result; text: "enter  next"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
-                    Text { text: "esc  close"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text { text: "ctrl+esc  close"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text {
                         text: "ctrl+,  settings"
                         color: root.settingsOpen ? root.accentColor : root.mutedColor
@@ -1099,10 +1250,26 @@ Item {
                         font.pixelSize: 12
                         Accessible.role: Accessible.Button
                         Accessible.name: "Open settings"
-                        Accessible.onPressAction: root.settingsOpen = true
-                        MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.settingsOpen = !root.settingsOpen }
+                        Accessible.onPressAction: root.openSettingsPanel(settingsPanel.currentSection)
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (root.settingsOpen) root.closeSettingsPanel()
+                                else root.openSettingsPanel(settingsPanel.currentSection)
+                            }
+                        }
                     }
-                    Text { text: "ctrl+l  language"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text {
+                        text: "ctrl+l  language"
+                        color: root.languagePanelOpen ? root.accentColor : root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 12
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Choose typing language"
+                        Accessible.onPressAction: root.openLanguagePanel()
+                    }
                 }
 
                 Text {

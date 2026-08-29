@@ -21,15 +21,33 @@ Item {
     Accessible.name: root.label
     Accessible.description: root.detail + (root.detail.length > 0 ? "; " : "") + "current value " + String(root.value)
 
+    function ensureOptionVisible(index) {
+        if (!root.narrowLayout) {
+            choiceViewport.contentX = 0
+            return
+        }
+        var item = optionRepeater.itemAt(index)
+        if (!item) return
+        var maximum = Math.max(0, choiceViewport.contentWidth - choiceViewport.width)
+        if (item.x < choiceViewport.contentX) choiceViewport.contentX = Math.max(0, item.x)
+        else if (item.x + item.width > choiceViewport.contentX + choiceViewport.width)
+            choiceViewport.contentX = Math.min(maximum, item.x + item.width - choiceViewport.width)
+    }
+
     function selectNext(delta) {
         if (!root.options || root.options.length === 0) return
         var current = root.options.indexOf(root.value)
         if (current < 0) current = 0
         var next = (current + delta + root.options.length) % root.options.length
         root.selected(root.options[next])
+        Qt.callLater(function() { root.ensureOptionVisible(next) })
     }
 
+    onValueChanged: Qt.callLater(function() { root.ensureOptionVisible(root.options.indexOf(root.value)) })
+    onWidthChanged: Qt.callLater(function() { root.ensureOptionVisible(root.options.indexOf(root.value)) })
+
     Keys.onPressed: function(event) {
+        if (event.modifiers & Qt.ControlModifier) return
         if (event.key === Qt.Key_Left) root.selectNext(-1)
         else if (event.key === Qt.Key_Right || event.key === Qt.Key_Space || event.key === Qt.Key_Enter || event.key === Qt.Key_Return) root.selectNext(1)
         else return
@@ -82,7 +100,8 @@ Item {
             id: choiceRow
             spacing: 7
             Repeater {
-            model: root.options
+                id: optionRepeater
+                model: root.options
             delegate: Rectangle {
                 required property var modelData
                 readonly property string optionLabel: typeof modelData === "boolean" ? (modelData ? "on" : "off") : String(modelData)
