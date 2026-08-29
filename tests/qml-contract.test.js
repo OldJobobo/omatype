@@ -53,8 +53,10 @@ test("overlay translates Monkeytype geometry through Omarchy semantic colors", (
   assert.doesNotMatch(q, /textFormat: Text\.RichText/);
 });
 
-test("header omits redundant offline status", () => {
+test("header uses the OmaType product name and omits redundant offline status", () => {
   const q = read("OmaType.qml");
+  assert.match(q, /text:\s*"OmaType"/);
+  assert.doesNotMatch(q, /text:\s*"omatype"/);
   assert.doesNotMatch(q, /text:\s*"offline"/);
 });
 

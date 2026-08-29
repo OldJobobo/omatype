@@ -605,7 +605,7 @@ Item {
                         anchors.left: logoIcon.right
                         anchors.leftMargin: 9
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "omatype"
+                        text: "OmaType"
                         color: root.textColor
                         font.family: root.typeface
                         font.pixelSize: 30
