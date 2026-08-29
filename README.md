@@ -2,6 +2,8 @@
 
 OmaType (`jobo.omatype`) is an original MIT-licensed, offline typing-practice plugin for Omarchy. It takes visual cues from the calm, distraction-free category of typing trainers without copying Monkeytype code, word data, or assets.
 
+![OmaType typing interface](preview.png)
+
 ## Features
 
 - Responsive full-screen overlay using the active Omarchy background, foreground, accent, muted, urgent, and typography tokens.
@@ -31,7 +33,15 @@ No account, telemetry, network request, copied Monkeytype source, or copied Monk
 
 ## Installation
 
-Install this repository through Quattro's local-plugin workflow using the repository root. For a development checkout:
+Install the public repository with Omarchy's plugin manager:
+
+```sh
+omarchy plugin add https://github.com/OldJobobo/omatype.git --enable
+```
+
+OmaType requires the Omarchy Quattro shell. It has no third-party runtime, package-manager, account, network, telemetry, or cloud-service dependency.
+
+For a local development checkout instead:
 
 ```sh
 mkdir -p ~/.config/omarchy/plugins
@@ -40,6 +50,20 @@ omarchy plugin validate ~/.config/omarchy/plugins/jobo.omatype
 omarchy plugin enable jobo.omatype right
 omarchy-restart-shell
 ```
+
+## Removal
+
+Remove the plugin safely through Omarchy:
+
+```sh
+omarchy plugin remove jobo.omatype
+```
+
+Removal does not delete the user's preferences or typing history. To erase those files too, the user may explicitly remove `~/.config/omarchy/omatype-settings.json` and `~/.local/state/omarchy/omatype-history.json` after uninstalling.
+
+## Permissions and data
+
+Like all Quattro plugins, OmaType runs unsandboxed with the current user's permissions inside `omarchy-shell`. OmaType uses that access only for its own local configuration and state files plus the host shell command that opens or closes its interface. It does not use the network, invoke a package manager, request elevated privileges, read credentials, or modify unrelated user configuration.
 
 The manifest declares both entry points:
 
