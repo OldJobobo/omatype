@@ -53,6 +53,11 @@ test("overlay translates Monkeytype geometry through Omarchy semantic colors", (
   assert.doesNotMatch(q, /textFormat: Text\.RichText/);
 });
 
+test("header omits redundant offline status", () => {
+  const q = read("OmaType.qml");
+  assert.doesNotMatch(q, /text:\s*"offline"/);
+});
+
 test("overlay keeps epoch time at double precision and publishes one complete result object", () => {
   const q = read("OmaType.qml");
   includesAll(q, ["property double nowMs", "var summary = Metrics.summarize", "result = summary", "summary.characters", "summary.correct"]);

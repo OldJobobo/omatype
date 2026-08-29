@@ -611,14 +611,6 @@ Item {
                         font.pixelSize: 30
                         font.weight: Font.DemiBold
                     }
-                    Text {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "offline"
-                        color: root.mutedColor
-                        font.family: root.typeface
-                        font.pixelSize: 13
-                    }
                 }
 
                 Row {
