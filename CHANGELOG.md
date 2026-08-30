@@ -4,6 +4,8 @@ All notable changes to OmaType are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-30
+
 ### Added
 
 - A persistent, keyboard-first progress view with strict current-setup comparisons, paired net/raw pace charts, retained-result detail, historical interval curves, 90-day activity, streaks, totals, daily goals, and same-setup language comparisons.
