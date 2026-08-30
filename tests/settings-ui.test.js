@@ -199,8 +199,11 @@ test("settings persistence uses config storage and includes every schema categor
   includesAll(root, [
     '/.config/omarchy/omatype-settings.json',
     'property var accessibility: ({})',
+    'property var progress: ({})',
     'accessibility: settingsAdapter.accessibility',
-    'settingsAdapter.accessibility = root.userSettings.accessibility'
+    'progress: settingsAdapter.progress',
+    'settingsAdapter.accessibility = root.userSettings.accessibility',
+    'settingsAdapter.progress = root.userSettings.progress'
   ]);
   assert.ok(root.includes('id: settingsStore\n        path: Quickshell.env("HOME") + "/.config/omarchy/omatype-settings.json"'));
 });

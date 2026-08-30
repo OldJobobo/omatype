@@ -15,6 +15,7 @@ import "src/layout.js" as Layout
 import "src/languages.js" as Languages
 import "src/words.js" as WordList
 import "components/settings" as SettingsUi
+import "components/progress" as ProgressUi
 
 Item {
     id: root
@@ -34,10 +35,25 @@ Item {
     property var generated: null
     property var samples: []
     property var result: null
+    property bool resultSaved: false
+    property string resultSaveStatus: "idle"
+    property bool historyWritePending: false
+    property string historyPendingOperation: ""
+    property string historyPendingResultTimestamp: ""
+    property string historyPendingTargetId: ""
+    property var historyPendingEffects: []
+    property var historyWriteSnapshot: null
+    property var historyQueuedWrite: null
+    property bool historyReloadAfterFailure: false
+    property bool csvWritePending: false
+    property bool settingsWritePending: false
+    property string settingsStatus: ""
     // Epoch milliseconds exceed a QML int. Keeping this as double prevents
     // elapsed time from collapsing to one millisecond on real sessions.
     property double nowMs: Date.now()
     property bool settingsOpen: false
+    property bool progressOpen: false
+    property string csvStatus: ""
     property real activeWordY: 0
     property int generationBatch: 0
     property int sampledKeystrokes: 0
@@ -52,7 +68,7 @@ Item {
     readonly property var timeOptions: [15, 30, 60, 120]
     readonly property var wordOptions: [10, 25, 50, 100]
     readonly property var settingsSections: ["test", "behavior", "display", "caret", "access"]
-    readonly property var settingsCategories: ["test", "behavior", "appearance", "caret", "accessibility"]
+    readonly property var settingsCategories: ["test", "behavior", "appearance", "caret", "accessibility", "progress"]
     readonly property var languageOptions: Languages.options()
     readonly property var currentLanguagePack: Languages.get(root.language)
     readonly property var activeLanguagePack: Languages.get(root.activeLanguage)
@@ -109,7 +125,8 @@ Item {
             behavior: settingsAdapter.behavior,
             caret: settingsAdapter.caret,
             appearance: settingsAdapter.appearance,
-            accessibility: settingsAdapter.accessibility
+            accessibility: settingsAdapter.accessibility,
+            progress: settingsAdapter.progress
         })
         if (syncSetup === true) root.syncStoredTestSettings()
     }
@@ -121,7 +138,8 @@ Item {
             behavior: legacySettingsAdapter.behavior,
             caret: legacySettingsAdapter.caret,
             appearance: legacySettingsAdapter.appearance,
-            accessibility: legacySettingsAdapter.accessibility
+            accessibility: legacySettingsAdapter.accessibility,
+            progress: legacySettingsAdapter.progress
         })
         root.syncStoredTestSettings()
         root.persistSettings()
@@ -142,7 +160,16 @@ Item {
         settingsAdapter.caret = root.userSettings.caret
         settingsAdapter.appearance = root.userSettings.appearance
         settingsAdapter.accessibility = root.userSettings.accessibility
-        settingsStore.writeAdapter()
+        settingsAdapter.progress = root.userSettings.progress
+        root.settingsWritePending = true
+        root.settingsStatus = ""
+        try {
+            settingsStore.writeAdapter()
+        } catch (error) {
+            root.settingsWritePending = false
+            root.settingsStatus = "settings were not saved"
+            console.warn("OmaType settings save failed: " + error)
+        }
     }
 
     function applySetting(category, key, value) {
@@ -153,6 +180,15 @@ Item {
         if (category === "test") root.syncStoredTestSettings()
         if ((category === "test" || category === "behavior") && root.opened && !activeRun) root.newTest()
         if (category === "appearance" && !activeRun) Qt.callLater(function() { root.rebuildWordLayout(wordsClip.width) })
+        return true
+    }
+
+    function applyProgressGoal(metric, target) {
+        if (!Settings.isValidUpdate(root.userSettings, "progress", "goalMetric", metric)
+                || !Settings.isValidUpdate(root.userSettings, "progress", "goalTarget", target)) return false
+        var next = Settings.update(root.userSettings, "progress", "goalMetric", metric)
+        root.userSettings = Settings.update(next, "progress", "goalTarget", target)
+        root.persistSettings()
         return true
     }
 
@@ -190,6 +226,7 @@ Item {
 
     function openSettingsPanel(section) {
         root.languagePanelOpen = false
+        root.progressOpen = false
         root.settingsOpen = true
         var index = root.settingsSections.indexOf(section)
         if (index < 0) index = root.settingsSections.indexOf(settingsPanel.currentSection)
@@ -207,6 +244,7 @@ Item {
 
     function openLanguagePanel() {
         root.settingsOpen = false
+        root.progressOpen = false
         root.languagePanelOpen = true
         var current = -1
         for (var i = 0; i < root.languageOptions.length; ++i) {
@@ -219,6 +257,32 @@ Item {
     function closeLanguagePanel() {
         root.languagePanelOpen = false
         Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+    }
+
+    function canOpenProgress() {
+        return !root.typing || root.typing.startedAt === null || !!root.result
+    }
+
+    function openProgressPanel() {
+        if (!root.canOpenProgress()) return false
+        root.settingsOpen = false
+        root.languagePanelOpen = false
+        progressPanel.resetConfirmations()
+        root.progressOpen = true
+        root.csvStatus = ""
+        progressPanel.statusMessage = root.historyDocument() ? "" : "history schema is newer than this OmaType build"
+        Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+        return true
+    }
+
+    function closeProgressPanel() {
+        root.progressOpen = false
+        Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+    }
+
+    function toggleProgressPanel() {
+        if (root.progressOpen) root.closeProgressPanel()
+        else root.openProgressPanel()
     }
 
     function chooseLanguage(languageId) {
@@ -257,6 +321,8 @@ Item {
         root.applyAutomationTransaction(payload, validSettingPayload, validResetPayload)
         if ((validSettingPayload || validResetPayload) && activeRunBeforeAutomation) {
             if (payload.settings === true) {
+                progressOpen = false
+                languagePanelOpen = false
                 settingsOpen = true
                 var activeSection = settingsSections.indexOf(payload.settingsSection) >= 0 ? payload.settingsSection : "test"
                 Qt.callLater(function() { settingsPanel.currentSection = activeSection })
@@ -276,6 +342,7 @@ Item {
         var requestedSettingsSection = settingsSections.indexOf(payload.settingsSection) >= 0 ? payload.settingsSection : "test"
         settingsOpen = payload.settings === true
         languagePanelOpen = false
+        progressOpen = false
         seed = typeof payload.seed === "string" && payload.seed.length > 0
             ? String(payload.seed).slice(0, 128)
             : "omatype-" + Date.now()
@@ -289,6 +356,7 @@ Item {
         opened = false
         settingsOpen = false
         languagePanelOpen = false
+        progressOpen = false
     }
 
     function dismiss() {
@@ -321,6 +389,8 @@ Item {
         sampledKeystrokes = 0
         lastSampleMs = 0
         result = null
+        resultSaved = false
+        resultSaveStatus = "idle"
         nowMs = Date.now()
         activeWordY = 0
         Qt.callLater(function() {
@@ -391,14 +461,213 @@ Item {
         return Math.max(0, generated.words.length - 1)
     }
 
-    function finishTest() {
+    function historyAdapterDocument() {
+        return History.normalize({
+            schemaVersion: historyAdapter.schemaVersion,
+            entries: historyAdapter.entries,
+            tests: historyAdapter.tests,
+            rollups: historyAdapter.rollups,
+            archive: historyAdapter.archive
+        })
+    }
+
+    function historyDocument() {
+        return root.historyQueuedWrite && root.historyQueuedWrite.document
+            ? History.normalize(root.historyQueuedWrite.document)
+            : root.historyAdapterDocument()
+    }
+
+    function historyAdapterSnapshot() {
+        return {
+            schemaVersion: historyAdapter.schemaVersion,
+            entries: historyAdapter.entries,
+            tests: historyAdapter.tests,
+            rollups: historyAdapter.rollups,
+            archive: historyAdapter.archive
+        }
+    }
+
+    function applyHistoryAdapter(document, clearLegacyTests) {
+        historyAdapter.schemaVersion = document.schemaVersion
+        historyAdapter.entries = document.entries || []
+        historyAdapter.tests = clearLegacyTests ? [] : (document.tests || [])
+        historyAdapter.rollups = document.rollups || []
+        historyAdapter.archive = document.archive || []
+    }
+
+    function markHistoryWriteStarted(request) {
+        var effects = request.effects || []
+        var currentResultWillBeSaved = false
+        for (var effectIndex = 0; effectIndex < effects.length; ++effectIndex) {
+            var effect = effects[effectIndex]
+            if (effect.kind === "result" && root.result && root.result.timestamp === effect.resultTimestamp)
+                currentResultWillBeSaved = true
+            else if (effect.kind === "clear" || (effect.kind === "delete" && root.result && root.result.id === effect.targetId))
+                currentResultWillBeSaved = false
+        }
+        if (currentResultWillBeSaved) {
+            root.resultSaved = false
+            root.resultSaveStatus = "saving"
+        }
+        if (request.operation === "delete") progressPanel.statusMessage = "deleting retained result…"
+        else if (request.operation === "clear") progressPanel.statusMessage = "clearing history…"
+    }
+
+    function startHistoryWrite(request) {
+        root.historyWriteSnapshot = root.historyAdapterSnapshot()
+        root.historyWritePending = true
+        root.historyPendingOperation = request.operation
+        root.historyPendingResultTimestamp = request.resultTimestamp
+        root.historyPendingTargetId = request.targetId
+        root.historyPendingEffects = request.effects || []
+        root.applyHistoryAdapter(request.document, true)
+        root.markHistoryWriteStarted(request)
+        try {
+            historyStore.writeAdapter()
+            return true
+        } catch (error) {
+            root.completeHistoryWrite(false, error)
+            return false
+        }
+    }
+
+    function persistHistory(document, operation, resultTimestamp, targetId) {
+        if (!document || document.schemaVersion !== History.SCHEMA_VERSION) return false
+        var kind = operation || "history"
+        var request = {
+            document: document,
+            operation: kind,
+            resultTimestamp: resultTimestamp || "",
+            targetId: targetId || "",
+            effects: [{kind: kind, resultTimestamp: resultTimestamp || "", targetId: targetId || ""}]
+        }
+        if (root.historyWritePending || root.historyReloadAfterFailure) {
+            if (root.historyQueuedWrite && root.historyQueuedWrite.effects)
+                request.effects = root.historyQueuedWrite.effects.concat(request.effects)
+            root.historyQueuedWrite = request
+            root.markHistoryWriteStarted(request)
+            return true
+        }
+        return root.startHistoryWrite(request)
+    }
+
+    function drainQueuedHistoryWrite() {
+        if (root.historyWritePending || root.historyReloadAfterFailure || !root.historyQueuedWrite) return
+        var request = root.historyQueuedWrite
+        root.historyQueuedWrite = null
+        root.startHistoryWrite(request)
+    }
+
+    function completeHistoryWrite(saved, error) {
+        var operation = root.historyPendingOperation
+        var resultTimestamp = root.historyPendingResultTimestamp
+        var targetId = root.historyPendingTargetId
+        var effects = root.historyPendingEffects || []
+        var snapshot = root.historyWriteSnapshot
+        if (!saved && snapshot) root.applyHistoryAdapter(snapshot, false)
+        if (!saved) root.historyReloadAfterFailure = true
+        root.historyWritePending = false
+        root.historyPendingOperation = ""
+        root.historyPendingResultTimestamp = ""
+        root.historyPendingTargetId = ""
+        root.historyPendingEffects = []
+        root.historyWriteSnapshot = null
+        if (saved) {
+            if (operation === "delete") progressPanel.statusMessage = "retained result deleted"
+            else if (operation === "clear") {
+                progressPanel.selectedIndex = 0
+                progressPanel.statusMessage = "history cleared"
+            }
+            for (var effectIndex = 0; effectIndex < effects.length; ++effectIndex) {
+                var effect = effects[effectIndex]
+                if (effect.kind === "result" && root.result && root.result.timestamp === effect.resultTimestamp) {
+                    root.resultSaved = true
+                    root.resultSaveStatus = "saved"
+                } else if (effect.kind === "delete" && root.result && root.result.id === effect.targetId) {
+                    root.resultSaved = false
+                    root.resultSaveStatus = "deleted"
+                } else if (effect.kind === "clear" && root.result) {
+                    root.resultSaved = false
+                    root.resultSaveStatus = "cleared"
+                }
+            }
+            root.drainQueuedHistoryWrite()
+            return
+        }
+        if (operation === "result" && root.result && root.result.timestamp === resultTimestamp) {
+            root.resultSaved = false
+            root.resultSaveStatus = "failed"
+        }
+        if (root.historyQueuedWrite && effects.length)
+            root.historyQueuedWrite.effects = effects.concat(root.historyQueuedWrite.effects || [])
+        progressPanel.statusMessage = root.historyQueuedWrite ? "history save failed · retrying queued changes" : (operation === "result" ? "result was not saved" : operation + " failed · history unchanged on disk")
+        console.warn("OmaType history save failed: " + error)
+        historyStore.reload()
+    }
+
+    function finishHistoryFailureReload(error) {
+        if (!root.historyReloadAfterFailure) return
+        root.historyReloadAfterFailure = false
+        if (error) console.warn("OmaType history reload after save failure failed: " + error)
+        root.drainQueuedHistoryWrite()
+    }
+
+    function deleteHistoryEntry(id) {
+        var document = root.historyDocument()
+        if (!document) {
+            progressPanel.statusMessage = "history schema is newer than this OmaType build"
+            return
+        }
+        var removed = History.remove(document, id)
+        if (!removed.deleted) {
+            progressPanel.statusMessage = removed.reason === "compacted" ? "compacted results cannot be individually deleted" : "result not found"
+            return
+        }
+        root.persistHistory(removed.history, "delete", "", id)
+    }
+
+    function clearHistory() {
+        if (!root.historyDocument()) {
+            progressPanel.statusMessage = "history schema is newer than this OmaType build"
+            return
+        }
+        root.persistHistory(History.clear(), "clear", "", "")
+    }
+
+    function exportHistoryCsv() {
+        var document = root.historyDocument()
+        if (!document) {
+            root.csvStatus = "export failed · unsupported history schema"
+            progressPanel.statusMessage = root.csvStatus
+            return
+        }
+        if (root.csvWritePending) {
+            progressPanel.statusMessage = "CSV export already in progress"
+            return
+        }
+        root.csvWritePending = true
+        root.csvStatus = "exporting CSV…"
+        progressPanel.statusMessage = root.csvStatus
+        try {
+            csvStore.setText(History.toCsv(document))
+        } catch (error) {
+            root.csvWritePending = false
+            root.csvStatus = "CSV export failed"
+            progressPanel.statusMessage = root.csvStatus
+            console.warn("OmaType CSV export failed: " + error)
+        }
+    }
+
+    function finishTest(completionReason) {
         if (result || !typing || typing.startedAt === null) return
-        var elapsed = Math.max(1, nowMs - typing.startedAt)
+        var endedAt = typing.endedAt !== null ? typing.endedAt : Date.now()
+        root.nowMs = endedAt
+        var elapsed = Math.max(1, endedAt - typing.startedAt)
         if (lastSampleMs <= 0) lastSampleMs = typing.startedAt
-        if (typing.totalKeystrokes > sampledKeystrokes && nowMs > lastSampleMs) {
-            samples = samples.concat([Metrics.intervalWpm(typing.totalKeystrokes, sampledKeystrokes, nowMs - lastSampleMs)])
+        if (typing.totalKeystrokes > sampledKeystrokes && endedAt > lastSampleMs) {
+            samples = samples.concat([Metrics.intervalWpm(typing.totalKeystrokes, sampledKeystrokes, endedAt - lastSampleMs)])
             sampledKeystrokes = typing.totalKeystrokes
-            lastSampleMs = nowMs
+            lastSampleMs = endedAt
         }
         var summary = Metrics.summarize({
             correct: typing.totalKeystrokes - typing.errorKeystrokes,
@@ -406,21 +675,34 @@ Item {
             elapsedMs: elapsed,
             samples: samples
         })
-        summary.timestamp = new Date(nowMs).toISOString()
+        var finishedAt = new Date(endedAt)
+        summary.timestamp = finishedAt.toISOString()
         summary.mode = root.activeSettings.test.mode
         summary.amount = root.activeSettings.test.mode === "time" ? root.activeSettings.test.time : root.activeSettings.test.words
         summary.language = activeLanguage
+        summary.punctuation = root.activeSettings.test.punctuation && !root.programmingLanguage
+        summary.numbers = root.activeSettings.test.numbers && !root.programmingLanguage
+        summary.completion = InputPolicy.completionFor(summary.mode, summary.amount, elapsed, completionReason)
+        summary.metricsVersion = 1
+        summary.elapsedMs = elapsed
+        summary.timezoneOffsetMinutes = finishedAt.getTimezoneOffset()
+        summary.localDay = History.localDayAt(summary.timestamp, summary.timezoneOffsetMinutes)
         summary.seed = seed
+        summary.samples = samples.slice(0, History.MAX_SAMPLES)
         summary.characters = typing.totalKeystrokes
         summary.errors = typing.errorKeystrokes
         summary.correct = typing.totalKeystrokes - typing.errorKeystrokes
         summary.corrected = typing.correctedErrors
         summary.uncorrectedErrors = typing.errors
         summary.corrections = typing.corrections
+        summary.id = History.deterministicId(summary)
         result = summary
-        var normalized = History.add({schemaVersion: 1, entries: historyAdapter.entries}, summary)
-        historyAdapter.entries = normalized.entries
-        historyStore.writeAdapter()
+        resultSaved = false
+        var currentHistory = root.historyDocument()
+        if (currentHistory) {
+            resultSaveStatus = "saving"
+            if (!root.persistHistory(History.add(currentHistory, summary), "result", summary.timestamp)) resultSaveStatus = "failed"
+        } else resultSaveStatus = "unsupported"
         Qt.callLater(function() { resultChart.requestPaint() })
     }
 
@@ -460,11 +742,37 @@ Item {
         atomicWrites: true
         blockLoading: true
         watchChanges: true
-        onFileChanged: reload()
+        onFileChanged: if (!root.historyWritePending && !root.historyReloadAfterFailure) reload()
+        onLoaded: root.finishHistoryFailureReload("")
+        onLoadFailed: function(error) { root.finishHistoryFailureReload(error) }
+        onSaved: root.completeHistoryWrite(true, "")
+        onSaveFailed: function(error) { root.completeHistoryWrite(false, error) }
         adapter: JsonAdapter {
             id: historyAdapter
             property int schemaVersion: 1
             property var entries: []
+            property var tests: []
+            property var rollups: []
+            property var archive: []
+        }
+    }
+
+    FileView {
+        id: csvStore
+        path: Quickshell.env("HOME") + "/.local/state/omarchy/omatype-history.csv"
+        atomicWrites: true
+        blockLoading: false
+        printErrors: false
+        onSaved: {
+            root.csvWritePending = false
+            root.csvStatus = "saved ~/.local/state/omarchy/omatype-history.csv"
+            progressPanel.statusMessage = root.csvStatus
+        }
+        onSaveFailed: function(error) {
+            root.csvWritePending = false
+            root.csvStatus = "CSV export failed"
+            progressPanel.statusMessage = root.csvStatus
+            console.warn("OmaType CSV export failed: " + error)
         }
     }
 
@@ -481,6 +789,7 @@ Item {
             property var caret: ({})
             property var appearance: ({})
             property var accessibility: ({})
+            property var progress: ({})
         }
     }
 
@@ -492,6 +801,15 @@ Item {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: root.loadSettings(true)
+        onSaved: {
+            root.settingsWritePending = false
+            root.settingsStatus = ""
+        }
+        onSaveFailed: function(error) {
+            root.settingsWritePending = false
+            root.settingsStatus = "settings were not saved"
+            console.warn("OmaType settings save failed: " + error)
+        }
         adapter: JsonAdapter {
             id: settingsAdapter
             property int schemaVersion: 1
@@ -500,6 +818,7 @@ Item {
             property var caret: ({})
             property var appearance: ({})
             property var accessibility: ({})
+            property var progress: ({})
         }
     }
 
@@ -538,7 +857,18 @@ Item {
                 if (event.key === Qt.Key_R && (event.modifiers & Qt.ControlModifier)) {
                     root.settingsOpen = false
                     root.languagePanelOpen = false
+                    root.progressOpen = false
                     root.restart()
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_H && controlHeld) {
+                    if (root.canOpenProgress()) root.toggleProgressPanel()
+                    event.accepted = true
+                    return
+                }
+                if (root.progressOpen) {
+                    progressPanel.handleKey(event)
                     event.accepted = true
                     return
                 }
@@ -632,7 +962,7 @@ Item {
                 }
                 if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
                     if (root.result) root.restart()
-                    else if (InputPolicy.shouldQuickEnd(root.activeSettings.test.mode, root.activeSettings.behavior.quickEnd, root.typing.startedAt !== null)) root.finishTest()
+                    else if (InputPolicy.shouldQuickEnd(root.activeSettings.test.mode, root.activeSettings.behavior.quickEnd, root.typing.startedAt !== null)) root.finishTest("quick-ended")
                     else if (InputPolicy.isQuickRestart(root.activeSettings.behavior.quickRestart, "enter")) root.restart()
                     event.accepted = true
                     return
@@ -700,7 +1030,7 @@ Item {
                     y: 135
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 12
-                    visible: (!root.focusMode || !root.runtimeSettings.appearance.focusHideSetup) && !root.result && !root.settingsOpen && !root.languagePanelOpen
+                    visible: (!root.focusMode || !root.runtimeSettings.appearance.focusHideSetup) && !root.result && !root.settingsOpen && !root.languagePanelOpen && !root.progressOpen
 
                     Rectangle {
                         width: languageControl.implicitWidth + 28
@@ -970,13 +1300,49 @@ Item {
                     onCloseRequested: root.closeSettingsPanel()
                 }
 
+                ProgressUi.ProgressView {
+                    id: progressPanel
+                    z: 12
+                    x: -content.x
+                    y: 92
+                    width: surface.width
+                    height: surface.height - 104
+                    visible: root.progressOpen
+                    history: root.historyDocument() || History.clear()
+                    currentSetup: ({
+                        mode: root.mode,
+                        amount: root.amount,
+                        language: root.language,
+                        punctuation: root.punctuation && root.currentLanguagePack.category !== "programming",
+                        numbers: root.numbers && root.currentLanguagePack.category !== "programming",
+                        metricsVersion: 1
+                    })
+                    goalMetric: root.userSettings.progress.goalMetric
+                    goalTarget: root.userSettings.progress.goalTarget
+                    backgroundColor: root.backgroundColor
+                    panelColor: root.controlColor
+                    accentColor: root.accentColor
+                    textColor: root.textColor
+                    mutedColor: root.mutedColor
+                    fontFamily: root.typeface
+                    reducedMotion: root.runtimeSettings.accessibility.reducedMotion
+                    highContrast: root.runtimeSettings.accessibility.highContrast
+                    onCloseRequested: root.closeProgressPanel()
+                    onDeleteRequested: function(id) { root.deleteHistoryEntry(id) }
+                    onClearRequested: root.clearHistory()
+                    onExportRequested: root.exportHistoryCsv()
+                    onGoalSettingChanged: function(metric, target) {
+                        root.applyProgressGoal(metric, target)
+                    }
+                }
+
                 Item {
                     id: testView
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: Math.round(surface.height * 0.39)
                     width: Math.min(parent.width, root.runtimeSettings.appearance.maxLineWidth)
                     height: root.runtimeSettings.appearance.lineCount * root.runtimeSettings.appearance.lineHeight
-                    visible: !root.result && !root.settingsOpen && !root.languagePanelOpen
+                    visible: !root.result && !root.settingsOpen && !root.languagePanelOpen && !root.progressOpen
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -1164,7 +1530,7 @@ Item {
                     y: Math.round(surface.height * 0.25)
                     width: parent.width
                     height: 360
-                    visible: !!root.result && !root.settingsOpen && !root.languagePanelOpen
+                    visible: !!root.result && !root.settingsOpen && !root.languagePanelOpen && !root.progressOpen
 
                     Row {
                         anchors.fill: parent
@@ -1233,16 +1599,39 @@ Item {
                             Text { text: root.result ? root.result.consistency.toFixed(0) + "%" : ""; color: root.textColor; font.family: root.typeface; font.pixelSize: 16 }
                         }
                     }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 278
+                        text: root.resultSaveStatus === "saving" ? "saving locally…" : root.resultSaveStatus === "saved" ? "saved locally · ctrl+h progress" : root.resultSaveStatus === "deleted" ? "deleted from local history" : root.resultSaveStatus === "cleared" ? "history cleared · result no longer saved" : root.resultSaveStatus === "failed" ? "not saved · disk write failed" : "not saved · unsupported history schema"
+                        color: root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 12
+                        Accessible.role: Accessible.Button
+                        Accessible.name: root.resultSaveStatus === "saving" ? "Saving result locally" : root.resultSaveStatus === "saved" ? "Saved locally. Open progress with Control H" : root.resultSaveStatus === "deleted" || root.resultSaveStatus === "cleared" ? "Result is no longer in local history" : "Result was not saved"
+                        Accessible.onPressAction: root.openProgressPanel()
+                        MouseArea { anchors.fill: parent; anchors.margins: -7; cursorShape: Qt.PointingHandCursor; onClicked: root.openProgressPanel() }
+                    }
                 }
 
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: surface.height - 108
                     spacing: 25
-                    visible: (!root.focusMode || !root.runtimeSettings.appearance.focusHideFooter) && !root.languagePanelOpen
+                    visible: (!root.focusMode || !root.runtimeSettings.appearance.focusHideFooter) && !root.languagePanelOpen && !root.progressOpen
                     Text { text: "ctrl+r  restart"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text { visible: !!root.result; text: "enter  next"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text { text: "ctrl+esc  close"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text {
+                        text: "ctrl+h  progress"
+                        color: root.progressOpen ? root.accentColor : root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 12
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Open progress"
+                        Accessible.onPressAction: root.openProgressPanel()
+                        MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.openProgressPanel() }
+                    }
                     Text {
                         text: "ctrl+,  settings"
                         color: root.settingsOpen ? root.accentColor : root.mutedColor
@@ -1276,7 +1665,7 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: surface.height - 77
                     visible: root.settingsOpen && !root.focusMode
-                    text: "seed  " + root.seed + "    history  " + historyAdapter.entries.length + "/100    local only"
+                    text: "seed  " + root.seed + "    retained history  " + historyAdapter.entries.length + "/2000    local only" + (root.settingsStatus ? "    · " + root.settingsStatus : "")
                     color: root.mutedColor
                     font.family: root.typeface
                     font.pixelSize: 11

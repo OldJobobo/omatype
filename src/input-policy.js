@@ -27,5 +27,11 @@ function shouldQuickEnd(mode, enabled, started) {
   return mode === "time" && enabled === true && started === true;
 }
 
-const api = {decide, isQuickRestart, shouldQuickEnd};
+function completionFor(mode, amount, elapsedMs, requested) {
+  const durationReached = mode === "time" && Number.isFinite(Number(amount))
+    && Number.isFinite(Number(elapsedMs)) && Number(elapsedMs) >= Number(amount) * 1000;
+  return requested === "quick-ended" && !durationReached ? "quick-ended" : "completed";
+}
+
+const api = {decide, isQuickRestart, shouldQuickEnd, completionFor};
 if (typeof module !== "undefined" && module.exports) module.exports = api;

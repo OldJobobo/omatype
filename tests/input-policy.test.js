@@ -36,6 +36,14 @@ test("backspace and quick end policies return explicit actions", () => {
   assert.equal(Policy.shouldQuickEnd("time", false, true), false);
 });
 
+test("timed completion wins at the exact duration boundary before the timer tick", () => {
+  assert.equal(Policy.completionFor("time", 30, 29999, "quick-ended"), "quick-ended");
+  assert.equal(Policy.completionFor("time", 30, 30000, "quick-ended"), "completed");
+  assert.equal(Policy.completionFor("time", 30, 30001, "quick-ended"), "completed");
+  assert.equal(Policy.completionFor("words", 25, 999999, "quick-ended"), "quick-ended");
+  assert.equal(Policy.completionFor("words", 25, 1000), "completed");
+});
+
 test("malformed typing state fails closed without throwing", () => {
   for (const state of [{}, {cursor: 0}, {target: null, cursor: 0}, {target: "a", cursor: -1}]) {
     assert.doesNotThrow(() => Policy.decide(state, "a", behavior()));

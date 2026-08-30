@@ -230,9 +230,11 @@ test("active runs stay isolated from config reloads and settings remain visible"
   ]);
 });
 
-test("QML runtime modules avoid unsupported globalThis fallback", () => {
-  for (const file of ["src/typing-state.js", "src/history.js"])
-    assert.doesNotMatch(read(file), /globalThis/, file);
+test("QML runtime modules avoid unsupported Node globals and globalThis fallbacks", () => {
+  for (const file of ["src/typing-state.js", "src/history.js", "src/progress.js"]) {
+    const source = read(file);
+    assert.doesNotMatch(source, /globalThis|process\.|Buffer|require\(/, file);
+  }
 });
 
 test("bar widget uses the supported Quattro bar host contract", () => {

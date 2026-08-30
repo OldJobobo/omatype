@@ -11,6 +11,7 @@ const TIMER_STYLES = ["text", "mini", "bar", "off"];
 const HIGHLIGHT_MODES = ["letter", "word", "next-word", "off"];
 const TYPED_EFFECTS = ["keep", "fade", "hide"];
 const ERROR_STYLES = ["color", "underline", "both"];
+const GOAL_METRICS = ["tests", "minutes", "characters"];
 const LANGUAGE_IDS = [
   "english", "ada", "assembly", "bash", "c", "clojure", "cpp", "csharp", "css",
   "dart", "elixir", "go", "haskell", "html", "java", "javascript", "json", "julia",
@@ -66,6 +67,10 @@ function defaults() {
       reducedMotion: false,
       highContrast: false,
       errorStyle: "color"
+    },
+    progress: {
+      goalMetric: "tests",
+      goalTarget: 10
     }
   };
 }
@@ -104,6 +109,7 @@ function normalize(raw) {
   const caret = object(source.caret) || {};
   const appearance = object(source.appearance) || {};
   const accessibility = object(source.accessibility) || {};
+  const progress = object(source.progress) || {};
 
   base.test.mode = oneOf(test.mode, ["time", "words"], base.test.mode);
   base.test.time = oneOf(test.time, [15, 30, 60, 120], base.test.time);
@@ -144,6 +150,9 @@ function normalize(raw) {
   base.accessibility.reducedMotion = boolean(accessibility.reducedMotion, base.accessibility.reducedMotion);
   base.accessibility.highContrast = boolean(accessibility.highContrast, base.accessibility.highContrast);
   base.accessibility.errorStyle = oneOf(accessibility.errorStyle, ERROR_STYLES, base.accessibility.errorStyle);
+
+  base.progress.goalMetric = oneOf(progress.goalMetric, GOAL_METRICS, base.progress.goalMetric);
+  base.progress.goalTarget = Math.round(number(progress.goalTarget, 1, 1000000, base.progress.goalTarget));
   return base;
 }
 
@@ -184,6 +193,7 @@ const api = {
   HIGHLIGHT_MODES,
   TYPED_EFFECTS,
   ERROR_STYLES,
+  GOAL_METRICS,
   LANGUAGE_IDS,
   defaults,
   normalize,

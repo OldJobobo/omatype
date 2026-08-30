@@ -47,6 +47,7 @@ test("settings expose versioned category defaults", () => {
     highContrast: false,
     errorStyle: "color"
   });
+  assert.deepEqual(value.progress, {goalMetric: "tests", goalTarget: 10});
 });
 
 test("normalization rejects malformed shapes and unknown keys", () => {
@@ -113,6 +114,15 @@ test("behavior, appearance, and accessibility settings are allowlisted and bound
   assert.equal(fallback.appearance.highlight, "letter");
   assert.equal(fallback.appearance.typedEffect, "keep");
   assert.equal(fallback.accessibility.errorStyle, "color");
+});
+
+test("progress goals migrate with defaults and remain bounded", () => {
+  assert.deepEqual(Settings.normalize({schemaVersion: 1}).progress, {goalMetric: "tests", goalTarget: 10});
+  assert.deepEqual(Settings.normalize({progress: {goalMetric: "minutes", goalTarget: 45}}).progress,
+    {goalMetric: "minutes", goalTarget: 45});
+  assert.equal(Settings.normalize({progress: {goalMetric: "streak", goalTarget: 0}}).progress.goalMetric, "tests");
+  assert.equal(Settings.normalize({progress: {goalTarget: 99999999}}).progress.goalTarget, 1000000);
+  assert.equal(Settings.update(Settings.defaults(), "progress", "goalTarget", 25).progress.goalTarget, 25);
 });
 
 test("language selection is allowlisted across every local pack", () => {

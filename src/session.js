@@ -3,6 +3,7 @@
 const Generator = typeof require !== "undefined" ? require("./generator.js") : globalThis.Generator;
 const State = typeof require !== "undefined" ? require("./typing-state.js") : globalThis.TypingState;
 const Metrics = typeof require !== "undefined" ? require("./metrics.js") : globalThis.Metrics;
+const InputPolicy = typeof require !== "undefined" ? require("./input-policy.js") : globalThis.InputPolicy;
 
 function create(options) {
   options = options || {};
@@ -24,21 +25,36 @@ function key(session, value, now) {
   return session;
 }
 
-function finish(session, now) {
+function finish(session, now, completion) {
   const state = session.state;
-  const elapsed = Math.max(1, (state.endedAt ?? now) - (state.startedAt ?? now));
+  const finishedMs = state.endedAt ?? now;
+  const elapsed = Math.max(1, finishedMs - (state.startedAt ?? finishedMs));
   const total = state.totalKeystrokes;
   const correct = Math.max(0, total - state.errorKeystrokes);
   const metrics = Metrics.summarize({correct, total, elapsedMs: elapsed, samples: session.samples});
+  const finishedAt = new Date(finishedMs);
+  const timezoneOffsetMinutes = finishedAt.getTimezoneOffset();
+  const localDay = new Date(finishedMs - timezoneOffsetMinutes * 60000).toISOString().slice(0, 10);
   return {
-    timestamp: new Date(now).toISOString(),
+    timestamp: finishedAt.toISOString(),
     mode: session.options.mode || "words",
     amount: Number(session.options.amount) || 25,
+    language: typeof session.options.language === "string" ? session.options.language : "english",
+    punctuation: session.options.punctuation === true,
+    numbers: session.options.numbers === true,
+    completion: state.completed ? "completed" : InputPolicy.completionFor(session.options.mode, session.options.amount, elapsed, "quick-ended"),
+    metricsVersion: 1,
+    elapsedMs: elapsed,
+    localDay,
+    timezoneOffsetMinutes,
     seed: session.seed,
+    samples: Array.isArray(session.samples) ? session.samples.slice(0, 600) : [],
     characters: total,
+    correct,
     errors: state.errorKeystrokes,
     uncorrectedErrors: state.errors,
     corrected: state.correctedErrors,
+    corrections: state.corrections,
     ...metrics
   };
 }
