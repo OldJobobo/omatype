@@ -2,6 +2,18 @@
 
 All notable changes to OmaType are documented here.
 
+## [Unreleased]
+
+### Added
+
+- A persistent, keyboard-first progress view with strict current-setup comparisons, paired net/raw pace charts, retained-result detail, historical interval curves, 90-day activity, streaks, totals, daily goals, and same-setup language comparisons.
+- Confirmed selective deletion, confirmed history clearing, and local CSV export for retained runs.
+
+### Changed
+
+- Local history now uses schema v2, retaining 2,000 individual runs before conserving older activity, totals, comparable averages, and personal bests in compacted rollups.
+- Results now persist effective test modifiers, completion reason, metrics version, elapsed time, local day, timezone offset, and bounded interval samples.
+
 ## [0.1.0] - 2026-08-28
 
 ### Added

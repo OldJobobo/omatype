@@ -23,6 +23,8 @@ Timed and word tests in a focused interface that follows your active theme—wit
 - Add punctuation and numbers to English prompts.
 - Practice English or one of **36 programming-language vocabularies**, including Bash, Nix, Python, Rust, JavaScript, TypeScript, C/C++, Go, SQL, Swift, Zig, and more.
 - Review WPM, raw WPM, accuracy, consistency, character counts, and a second-by-second speed chart.
+- Track comparable pace, personal bests, recent accuracy, streaks, daily activity, goals, and same-setup language progress over time.
+- Inspect or delete retained results, clear history with confirmation, and export retained runs to CSV.
 - Tune the caret, timer, live metrics, typography, line geometry, focus behavior, motion, contrast, and error indicators.
 
 English prompts are generated from OmaType's original 229-word offline corpus. Programming packs contain original, project-curated keywords, operators, syntax terms, and common API identifiers.
@@ -57,6 +59,7 @@ For a pointer-free launch, assign that command to an available shortcut through 
 | Toggle punctuation | `Ctrl+P` |
 | Toggle numbers | `Ctrl+N` |
 | Choose a language | `Ctrl+L` |
+| Open progress | `Ctrl+H` |
 | Open settings | `Ctrl+,` |
 | Close OmaType | `Ctrl+Escape` |
 
@@ -68,7 +71,11 @@ For a pointer-free launch, assign that command to an available shortcut through 
 - In the language picker, `Home/End` jumps to either boundary and `Page Up/Page Down` moves through the list faster. Press `Enter` or `Space` to select.
 - In settings, use `Ctrl+1` through `Ctrl+5` or `Ctrl+Left` / `Ctrl+Right` to switch between **Test**, **Behavior**, **Display**, **Caret**, and **Access**.
 - Left/Right changes the focused value, `Enter` / `Space` advances it, and `R` resets the current section. `Home/End` jumps to the first or last settings row; `Page Up/Page Down` scrolls the drawer.
+- In progress, use `Tab` / `Shift+Tab` to move between visible regions and `Left` / `Right` to change filters. In the retained-results region, `Up` / `Down`, `Home/End`, and `Page Up/Page Down` move through results; elsewhere those keys scroll the progress page. `C` restores the current-setup filter.
+- `Delete` requires a second press before removing the selected retained result. `Shift+Delete` or the clear-history control requires confirmation before all history is erased.
 - Plain `Escape` closes an open panel first. Otherwise, it follows your quick-restart preference or closes the overlay. `Ctrl+Escape` always closes OmaType.
+
+Progress comparisons default to the current exact mode, amount, language, punctuation, numbers, and metrics version. Mixed activity can be filtered by retained language, Time/Words mode, and amount for volume and streak inspection, but it is never presented as a combined WPM, accuracy, or personal best claim.
 
 Programming vocabularies preserve syntax tokens as written, so English punctuation and number transformations are unavailable while a programming language is selected.
 
@@ -78,10 +85,11 @@ OmaType does not use the network, read credentials, request elevated privileges,
 
 | Data | Location |
 | --- | --- |
-| Preferences | `~/.config/omarchy/omatype-settings.json` |
-| Latest 100 test results | `~/.local/state/omarchy/omatype-history.json` |
+| Preferences and daily goal | `~/.config/omarchy/omatype-settings.json` |
+| Typing history and compacted long-term statistics | `~/.local/state/omarchy/omatype-history.json` |
+| Optional retained-result CSV export | `~/.local/state/omarchy/omatype-history.csv` |
 
-Preferences are versioned and validated before use. A test snapshots its active behavior and setup preferences when it begins, so mid-test changes cannot alter the run already in progress.
+Preferences and history are versioned and validated before use. OmaType retains the newest 2,000 individual runs, then conserves older totals, daily activity, comparable averages, and personal bests in compacted local rollups. A test snapshots its active behavior and setup preferences when it begins, so mid-test changes cannot alter the run already in progress.
 
 > [!IMPORTANT]
 > Like all Quattro plugins, OmaType runs unsandboxed inside `omarchy-shell` with your current user permissions. OmaType uses that access only for the local files above and the host-shell command that opens or closes its interface.
@@ -92,7 +100,7 @@ Preferences are versioned and validated before use. A test snapshots its active 
 omarchy plugin remove jobo.omatype
 ```
 
-Removing the plugin leaves your preferences and history intact. To erase them as well, delete the two local files listed above after uninstalling.
+Removing the plugin leaves your preferences, history, and any CSV export intact. To erase them as well, delete the local files listed above after uninstalling.
 
 <details>
 <summary><strong>Local development</strong></summary>
@@ -126,7 +134,8 @@ QML runtime validation requires Qt 6, Quickshell, and the Quattro plugin host. C
 | `manifest.json` | Quattro schema-v1 plugin manifest |
 | `OmaType.qml` | Full-screen overlay entry point |
 | `BarWidget.qml` | Bar widget entry point |
-| `src/` | Generator, typing state, metrics, sessions, history, settings, layout, and language registry |
+| `src/` | Generator, typing state, metrics, sessions, schema-v2 history, progress aggregation, settings, layout, and language registry |
+| `components/progress/` | Keyboard-first progress view, pace charts, activity heatmap, and controls |
 | `data/words-en.json` | Original English word corpus |
 | `tests/` | Dependency-free Node tests and QML contract checks |
 
