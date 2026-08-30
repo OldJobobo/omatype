@@ -50,6 +50,17 @@ test("settings expose versioned category defaults", () => {
   assert.deepEqual(value.progress, {goalMetric: "tests", goalTarget: 10});
 });
 
+test("settings documents distinguish supported, malformed, and future schemas before normalization", () => {
+  assert.equal(Settings.documentStatus({schemaVersion: 1, test: {mode: "words"}}), "supported");
+  assert.equal(Settings.documentStatus({test: {mode: "words"}}), "supported");
+  assert.equal(Settings.documentStatus(null), "malformed");
+  assert.equal(Settings.documentStatus([]), "malformed");
+  const future = {schemaVersion: 2, test: {mode: "words"}};
+  assert.equal(Settings.documentStatus(future), "unsupported");
+  assert.deepEqual(Settings.readDocument(future), {status: "unsupported", value: null});
+  assert.equal(Settings.readDocument({schemaVersion: 1, test: {mode: "words"}}).value.test.mode, "words");
+});
+
 test("normalization rejects malformed shapes and unknown keys", () => {
   assert.deepEqual(Settings.normalize(null), Settings.defaults());
   assert.deepEqual(Settings.normalize([]), Settings.defaults());

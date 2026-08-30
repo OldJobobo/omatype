@@ -1,21 +1,16 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import "src/history.js" as History
 import "components/progress" as ProgressUi
 
 ShellRoot {
-    FileView {
-        path: Quickshell.env("PWD") + "/tests/fixtures/history-v1-tests.json"
-        blockLoading: true
-        adapter: JsonAdapter {
-            id: legacyHistoryAdapter
-            property int schemaVersion: 1
-            property var entries: []
-            property var tests: []
-            property var rollups: []
-            property var archive: []
-        }
+    QtObject {
+        id: legacyHistoryAdapter
+        property int schemaVersion: 1
+        property var entries: []
+        property var tests: [{timestamp: "2025-01-01T12:00:00.000Z", mode: "time", amount: 30, language: "english", wpm: 44, rawWpm: 47, accuracy: 96, characters: 90}]
+        property var rollups: []
+        property var archive: []
     }
     FloatingWindow {
         visible: true

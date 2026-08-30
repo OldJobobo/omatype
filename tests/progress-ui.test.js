@@ -20,12 +20,12 @@ test("overlay migrates legacy tests and serializes rollback-safe history writes"
     'root.historyWritePending = false',
     'root.historyQueuedWrite.effects = effects.concat(root.historyQueuedWrite.effects || [])',
     'root.historyReloadAfterFailure = true',
-    'onLoaded: root.finishHistoryFailureReload("")',
-    'onLoadFailed: function(error) { root.finishHistoryFailureReload(error) }',
+    'root.finishHistoryRead(text, exists, "")',
+    'onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }',
     'onSaved: root.completeHistoryWrite(true, "")',
     'onSaveFailed: function(error) { root.completeHistoryWrite(false, error) }',
     'historyAdapter.tests = clearLegacyTests ? [] : (document.tests || [])',
-    'historyStore.writeAdapter()'
+    'historyStore.save(serialized)'
   ]);
   const complete = qml.slice(qml.indexOf("function completeHistoryWrite"), qml.indexOf("function finishHistoryFailureReload"));
   assert.ok(complete.indexOf("root.applyHistoryAdapter(snapshot, false)") < complete.indexOf("root.historyReloadAfterFailure = true"));
@@ -60,11 +60,11 @@ test("result save copy waits for FileView saved and timed boundaries override qu
   assert.doesNotMatch(finish, /resultSaved\s*=\s*currentHistory\s*\?/);
 });
 
-test("CSV and settings persistence surface asynchronous failure without eager success", () => {
+test("CSV and settings secure persistence surface asynchronous failure without eager success", () => {
   const qml = read("OmaType.qml");
   includesAll(qml, [
     'property bool csvWritePending: false', 'root.csvStatus = "exporting CSV…"',
-    'csvStore.setText(History.toCsv(document))', 'id: csvStore', 'onSaved: {',
+    'csvStore.save(History.toCsv(document))', 'id: csvStore', 'onSaved: {',
     'root.csvStatus = "saved ~/.local/state/omarchy/omatype-history.csv"',
     'root.csvStatus = "CSV export failed"', 'OmaType CSV export failed:',
     'property bool settingsWritePending: false', 'root.settingsStatus = "settings were not saved"',

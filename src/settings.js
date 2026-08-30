@@ -99,6 +99,18 @@ function hex(value, fallback) {
     : fallback;
 }
 
+function documentStatus(raw) {
+  const source = object(raw);
+  if (!source) return "malformed";
+  if (source.schemaVersion !== undefined && source.schemaVersion !== SCHEMA_VERSION) return "unsupported";
+  return "supported";
+}
+
+function readDocument(raw) {
+  const status = documentStatus(raw);
+  return {status, value: status === "supported" ? normalize(raw) : null};
+}
+
 function normalize(raw) {
   const base = defaults();
   const source = object(raw);
@@ -196,6 +208,8 @@ const api = {
   GOAL_METRICS,
   LANGUAGE_IDS,
   defaults,
+  documentStatus,
+  readDocument,
   normalize,
   isValidUpdate,
   update,

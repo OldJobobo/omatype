@@ -89,7 +89,9 @@ OmaType does not use the network, read credentials, request elevated privileges,
 | Typing history and compacted long-term statistics | `~/.local/state/omarchy/omatype-history.json` |
 | Optional retained-result CSV export | `~/.local/state/omarchy/omatype-history.csv` |
 
-Preferences and history are versioned and validated before use. OmaType retains the newest 2,000 individual runs, then conserves older totals, daily activity, comparable averages, and personal bests in compacted local rollups. A test snapshots its active behavior and setup preferences when it begins, so mid-test changes cannot alter the run already in progress.
+Preferences and history are versioned and validated before use. A settings file from a newer schema is left untouched: OmaType starts with safe in-memory defaults and refuses to overwrite it. Local reads are bounded and accept only owned regular files reached without following symlinks; FIFOs, sockets, directories, oversized content, and invalid UTF-8 are rejected. Saves use OmaType's bundled standard-library Python helper to create a private `0600` temporary file, sync it, and atomically replace the destination without following a destination symlink.
+
+OmaType retains the newest 2,000 individual runs, then conserves older totals, daily activity, comparable averages, and personal bests in compacted local rollups. A test snapshots its active behavior and setup preferences when it begins, so mid-test changes cannot alter the run already in progress.
 
 > [!IMPORTANT]
 > Like all Quattro plugins, OmaType runs unsandboxed inside `omarchy-shell` with your current user permissions. OmaType uses that access only for the local files above and the host-shell command that opens or closes its interface.
@@ -136,6 +138,7 @@ QML runtime validation requires Qt 6, Quickshell, and the Quattro plugin host. C
 | `BarWidget.qml` | Bar widget entry point |
 | `src/` | Generator, typing state, metrics, sessions, schema-v2 history, progress aggregation, settings, layout, and language registry |
 | `components/progress/` | Keyboard-first progress view, pace charts, activity heatmap, and controls |
+| `components/SecureFile.qml` and `scripts/secure_file.py` | Bounded, no-follow local persistence boundary |
 | `data/words-en.json` | Original English word corpus |
 | `tests/` | Dependency-free Node tests and QML contract checks |
 
