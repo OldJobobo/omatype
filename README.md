@@ -31,7 +31,7 @@ English prompts are generated from OmaType's original 229-word offline corpus. P
 
 ## Install
 
-OmaType requires an Omarchy installation using the Quattro shell.
+OmaType requires an Omarchy installation using the Quattro shell and the system Python 3 interpreter at `/usr/bin/python3` for secure local persistence. It uses only Python’s standard library; no third-party packages are needed.
 
 ```sh
 omarchy plugin add https://github.com/OldJobobo/omatype.git --enable
