@@ -8,7 +8,7 @@ test("manifest exposes the exact persistent overlay and bar widget contract", ()
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.id, "jobo.omatype");
   assert.equal(manifest.name, "OmaType");
-  assert.equal(manifest.version, "0.1.0");
+  assert.equal(manifest.version, "0.2.0");
   assert.equal(manifest.keepLoaded, true);
   assert.deepEqual(manifest.kinds, ["overlay", "bar-widget"]);
   assert.deepEqual(manifest.entryPoints, { overlay: "OmaType.qml", barWidget: "BarWidget.qml" });
