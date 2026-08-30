@@ -188,9 +188,10 @@ test("settings persistence migrates the previous state-scoped preference file", 
   includesAll(q, [
     'id: legacySettingsStore',
     '"/.local/state/omarchy/omatype-settings.json"',
-    "if (!settingsStore.loaded && legacySettingsStore.loaded)",
-    "Settings.normalize({",
-    "root.persistSettings()"
+    "!root.settingsCurrentResolved || !root.legacySettingsResolved",
+    "!root.settingsCurrentExists && root.legacySettingsValue",
+    "Settings.normalize(root.legacySettingsValue)",
+    "if (migrate) root.persistSettings()"
   ]);
 });
 
@@ -200,10 +201,11 @@ test("settings persistence uses config storage and includes every schema categor
     '/.config/omarchy/omatype-settings.json',
     'property var accessibility: ({})',
     'property var progress: ({})',
-    'accessibility: settingsAdapter.accessibility',
-    'progress: settingsAdapter.progress',
-    'settingsAdapter.accessibility = root.userSettings.accessibility',
-    'settingsAdapter.progress = root.userSettings.progress'
+    'accessibility: adapter.accessibility',
+    'progress: adapter.progress',
+    'adapter.accessibility = value.accessibility || ({})',
+    'adapter.progress = value.progress || ({})',
+    'settingsStore.save(JSON.stringify(normalized))'
   ]);
   assert.ok(root.includes('id: settingsStore\n        path: Quickshell.env("HOME") + "/.config/omarchy/omatype-settings.json"'));
 });

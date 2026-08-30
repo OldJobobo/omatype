@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import "src/generator.js" as Generator
@@ -14,6 +13,7 @@ import "src/ipc-policy.js" as IpcPolicy
 import "src/layout.js" as Layout
 import "src/languages.js" as Languages
 import "src/words.js" as WordList
+import "components" as Components
 import "components/settings" as SettingsUi
 import "components/progress" as ProgressUi
 
@@ -45,9 +45,21 @@ Item {
     property var historyWriteSnapshot: null
     property var historyQueuedWrite: null
     property bool historyReloadAfterFailure: false
+    property bool historyReady: false
+    property bool historyAvailable: false
+    property var pendingHistoryResults: []
     property bool csvWritePending: false
     property bool settingsWritePending: false
     property string settingsStatus: ""
+    property bool settingsReady: false
+    property bool settingsCurrentResolved: false
+    property bool settingsCurrentExists: false
+    property string settingsCurrentStatus: "pending"
+    property var settingsCurrentValue: null
+    property bool legacySettingsResolved: false
+    property bool legacySettingsExists: false
+    property var legacySettingsValue: null
+    property string pendingOpenPayload: ""
     // Epoch milliseconds exceed a QML int. Keeping this as double prevents
     // elapsed time from collapsing to one millisecond on real sessions.
     property double nowMs: Date.now()
@@ -118,31 +130,78 @@ Item {
         return codePoint >= 0x20 && codePoint !== 0x7f
     }
 
-    function loadSettings(syncSetup) {
-        root.userSettings = Settings.normalize({
-            schemaVersion: settingsAdapter.schemaVersion,
-            test: settingsAdapter.test,
-            behavior: settingsAdapter.behavior,
-            caret: settingsAdapter.caret,
-            appearance: settingsAdapter.appearance,
-            accessibility: settingsAdapter.accessibility,
-            progress: settingsAdapter.progress
+    function settingsAdapterValue(adapter) {
+        return Settings.normalize({
+            schemaVersion: adapter.schemaVersion,
+            test: adapter.test,
+            behavior: adapter.behavior,
+            caret: adapter.caret,
+            appearance: adapter.appearance,
+            accessibility: adapter.accessibility,
+            progress: adapter.progress
         })
+    }
+
+    function applySettingsAdapter(adapter, value) {
+        adapter.schemaVersion = value.schemaVersion
+        adapter.test = value.test || ({})
+        adapter.behavior = value.behavior || ({})
+        adapter.caret = value.caret || ({})
+        adapter.appearance = value.appearance || ({})
+        adapter.accessibility = value.accessibility || ({})
+        adapter.progress = value.progress || ({})
+    }
+
+    function parseSettingsText(text) {
+        try {
+            var parsed = JSON.parse(text)
+            return Settings.readDocument(parsed)
+        } catch (error) {
+            return {status: "malformed", value: null}
+        }
+    }
+
+    function loadSettings(syncSetup) {
+        root.userSettings = root.settingsAdapterValue(settingsAdapter)
         if (syncSetup === true) root.syncStoredTestSettings()
     }
 
-    function migrateLegacySettings() {
-        root.userSettings = Settings.normalize({
-            schemaVersion: legacySettingsAdapter.schemaVersion,
-            test: legacySettingsAdapter.test,
-            behavior: legacySettingsAdapter.behavior,
-            caret: legacySettingsAdapter.caret,
-            appearance: legacySettingsAdapter.appearance,
-            accessibility: legacySettingsAdapter.accessibility,
-            progress: legacySettingsAdapter.progress
-        })
+    function finishSettingsRead(current, text, exists, error) {
+        var document = !error && exists ? root.parseSettingsText(text) : null
+        var value = document ? document.value : null
+        if (current) {
+            root.settingsCurrentResolved = true
+            root.settingsCurrentExists = exists || !!error
+            root.settingsCurrentStatus = error ? "unavailable" : !exists ? "absent" : document.status
+            root.settingsCurrentValue = value
+            if (value) root.applySettingsAdapter(settingsAdapter, value)
+            if (root.settingsReady && value) root.loadSettings(true)
+        } else {
+            root.legacySettingsResolved = true
+            root.legacySettingsExists = exists || !!error
+            root.legacySettingsValue = value
+            if (value) root.applySettingsAdapter(legacySettingsAdapter, value)
+        }
+        root.finalizeSettingsStartup()
+    }
+
+    function finalizeSettingsStartup() {
+        if (root.settingsReady || !root.settingsCurrentResolved || !root.legacySettingsResolved) return
+        var migrate = false
+        if (root.settingsCurrentValue) root.userSettings = Settings.normalize(root.settingsCurrentValue)
+        else if (!root.settingsCurrentExists && root.legacySettingsValue) {
+            root.userSettings = Settings.normalize(root.legacySettingsValue)
+            migrate = true
+        } else root.userSettings = Settings.defaults()
+        root.settingsReady = true
         root.syncStoredTestSettings()
-        root.persistSettings()
+        if (!root.typing) root.newTest()
+        if (migrate) root.persistSettings()
+        if (root.pendingOpenPayload !== "") {
+            var payload = root.pendingOpenPayload
+            root.pendingOpenPayload = ""
+            Qt.callLater(function() { root.open(payload) })
+        }
     }
 
     function syncStoredTestSettings() {
@@ -154,22 +213,24 @@ Item {
     }
 
     function persistSettings() {
-        settingsAdapter.schemaVersion = root.userSettings.schemaVersion
-        settingsAdapter.test = root.userSettings.test
-        settingsAdapter.behavior = root.userSettings.behavior
-        settingsAdapter.caret = root.userSettings.caret
-        settingsAdapter.appearance = root.userSettings.appearance
-        settingsAdapter.accessibility = root.userSettings.accessibility
-        settingsAdapter.progress = root.userSettings.progress
+        if (!root.settingsReady) return false
+        if (root.settingsCurrentStatus === "unsupported") {
+            root.settingsWritePending = false
+            root.settingsStatus = "settings use a newer schema · changes not saved"
+            return false
+        }
+        var normalized = Settings.normalize(root.userSettings)
+        root.applySettingsAdapter(settingsAdapter, normalized)
         root.settingsWritePending = true
         root.settingsStatus = ""
         try {
-            settingsStore.writeAdapter()
+            if (settingsStore.save(JSON.stringify(normalized))) return true
         } catch (error) {
-            root.settingsWritePending = false
-            root.settingsStatus = "settings were not saved"
             console.warn("OmaType settings save failed: " + error)
         }
+        root.settingsWritePending = false
+        root.settingsStatus = "settings were not saved"
+        return false
     }
 
     function applySetting(category, key, value) {
@@ -260,7 +321,8 @@ Item {
     }
 
     function canOpenProgress() {
-        return !root.typing || root.typing.startedAt === null || !!root.result
+        return root.historyReady && root.historyAvailable
+            && (!root.typing || root.typing.startedAt === null || !!root.result)
     }
 
     function openProgressPanel() {
@@ -309,6 +371,10 @@ Item {
     function open(payloadJson) {
         var payload = IpcPolicy.parsePayload(payloadJson)
         if (payload === null) return
+        if (!root.settingsReady) {
+            root.pendingOpenPayload = JSON.stringify(payload)
+            return
+        }
         var activeRunBeforeAutomation = root.opened && root.focusMode
         var validSettingPayload = payload.setting && typeof payload.setting === "object" && !Array.isArray(payload.setting)
             && settingsCategories.indexOf(payload.setting.category) >= 0
@@ -472,6 +538,7 @@ Item {
     }
 
     function historyDocument() {
+        if (!root.historyReady || !root.historyAvailable) return null
         return root.historyQueuedWrite && root.historyQueuedWrite.document
             ? History.normalize(root.historyQueuedWrite.document)
             : root.historyAdapterDocument()
@@ -523,7 +590,11 @@ Item {
         root.applyHistoryAdapter(request.document, true)
         root.markHistoryWriteStarted(request)
         try {
-            historyStore.writeAdapter()
+            var serialized = JSON.stringify(request.document)
+            if (!historyStore.save(serialized)) {
+                root.completeHistoryWrite(false, "secure history write did not start")
+                return false
+            }
             return true
         } catch (error) {
             root.completeHistoryWrite(false, error)
@@ -573,6 +644,8 @@ Item {
         root.historyPendingEffects = []
         root.historyWriteSnapshot = null
         if (saved) {
+            root.historyReady = true
+            root.historyAvailable = true
             if (operation === "delete") progressPanel.statusMessage = "retained result deleted"
             else if (operation === "clear") {
                 progressPanel.selectedIndex = 0
@@ -612,6 +685,51 @@ Item {
         root.drainQueuedHistoryWrite()
     }
 
+    function finishHistoryRead(text, exists, error) {
+        var normalized = null
+        if (!error && !exists) normalized = History.clear()
+        else if (!error) {
+            try { normalized = History.normalize(JSON.parse(text)) }
+            catch (parseError) { normalized = null }
+        }
+        if (normalized) {
+            root.applyHistoryAdapter(normalized, true)
+            root.historyAvailable = true
+        } else root.historyAvailable = false
+        root.historyReady = true
+        if (root.historyReloadAfterFailure) root.finishHistoryFailureReload(error || (normalized ? "" : "history is invalid"))
+        root.persistPendingHistoryResults()
+    }
+
+    function persistPendingHistoryResults() {
+        if (!root.historyReady || root.pendingHistoryResults.length === 0) return
+        var pending = root.pendingHistoryResults
+        root.pendingHistoryResults = []
+        var document = root.historyDocument()
+        if (!document) {
+            if (root.result) root.resultSaveStatus = "failed"
+            return
+        }
+        var effects = []
+        for (var pendingIndex = 0; pendingIndex < pending.length; ++pendingIndex) {
+            document = History.add(document, pending[pendingIndex])
+            effects.push({kind: "result", resultTimestamp: pending[pendingIndex].timestamp, targetId: ""})
+        }
+        var request = {
+            document: document,
+            operation: "result",
+            resultTimestamp: pending[pending.length - 1].timestamp,
+            targetId: "",
+            effects: effects
+        }
+        if (root.historyWritePending || root.historyReloadAfterFailure) {
+            if (root.historyQueuedWrite && root.historyQueuedWrite.effects)
+                request.effects = root.historyQueuedWrite.effects.concat(request.effects)
+            root.historyQueuedWrite = request
+            root.markHistoryWriteStarted(request)
+        } else root.startHistoryWrite(request)
+    }
+
     function deleteHistoryEntry(id) {
         var document = root.historyDocument()
         if (!document) {
@@ -648,13 +766,10 @@ Item {
         root.csvWritePending = true
         root.csvStatus = "exporting CSV…"
         progressPanel.statusMessage = root.csvStatus
-        try {
-            csvStore.setText(History.toCsv(document))
-        } catch (error) {
+        if (!csvStore.save(History.toCsv(document))) {
             root.csvWritePending = false
             root.csvStatus = "CSV export failed"
             progressPanel.statusMessage = root.csvStatus
-            console.warn("OmaType CSV export failed: " + error)
         }
     }
 
@@ -699,7 +814,10 @@ Item {
         result = summary
         resultSaved = false
         var currentHistory = root.historyDocument()
-        if (currentHistory) {
+        if (!root.historyReady) {
+            resultSaveStatus = "saving"
+            root.pendingHistoryResults = root.pendingHistoryResults.concat([summary])
+        } else if (currentHistory) {
             resultSaveStatus = "saving"
             if (!root.persistHistory(History.add(currentHistory, summary), "result", summary.timestamp)) resultSaveStatus = "failed"
         } else resultSaveStatus = "unsupported"
@@ -707,9 +825,7 @@ Item {
     }
 
     Component.onCompleted: {
-        if (!settingsStore.loaded && legacySettingsStore.loaded) root.migrateLegacySettings()
-        else root.loadSettings(true)
-        newTest()
+        // SecureFile startup reads coordinate settings before the first test is built.
     }
 
     Timer {
@@ -736,33 +852,36 @@ Item {
         }
     }
 
-    FileView {
+    Components.SecureFile {
         id: historyStore
         path: Quickshell.env("HOME") + "/.local/state/omarchy/omatype-history.json"
-        atomicWrites: true
-        blockLoading: true
+        maxBytes: 16777216
         watchChanges: true
-        onFileChanged: if (!root.historyWritePending && !root.historyReloadAfterFailure) reload()
-        onLoaded: root.finishHistoryFailureReload("")
-        onLoadFailed: function(error) { root.finishHistoryFailureReload(error) }
+        onLoaded: function(text, exists) {
+            if (!root.historyWritePending && !root.historyReloadAfterFailure)
+                root.finishHistoryRead(text, exists, "")
+            else if (root.historyReloadAfterFailure)
+                root.finishHistoryRead(text, exists, "")
+        }
+        onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }
         onSaved: root.completeHistoryWrite(true, "")
         onSaveFailed: function(error) { root.completeHistoryWrite(false, error) }
-        adapter: JsonAdapter {
-            id: historyAdapter
-            property int schemaVersion: 1
-            property var entries: []
-            property var tests: []
-            property var rollups: []
-            property var archive: []
-        }
     }
 
-    FileView {
+    QtObject {
+        id: historyAdapter
+        property int schemaVersion: 1
+        property var entries: []
+        property var tests: []
+        property var rollups: []
+        property var archive: []
+    }
+
+    Components.SecureFile {
         id: csvStore
         path: Quickshell.env("HOME") + "/.local/state/omarchy/omatype-history.csv"
-        atomicWrites: true
-        blockLoading: false
-        printErrors: false
+        maxBytes: 16777216
+        preload: false
         onSaved: {
             root.csvWritePending = false
             root.csvStatus = "saved ~/.local/state/omarchy/omatype-history.csv"
@@ -776,50 +895,53 @@ Item {
         }
     }
 
-    FileView {
+    Components.SecureFile {
         id: legacySettingsStore
         path: Quickshell.env("HOME") + "/.local/state/omarchy/omatype-settings.json"
-        blockLoading: true
-        printErrors: false
-        adapter: JsonAdapter {
-            id: legacySettingsAdapter
-            property int schemaVersion: 1
-            property var test: ({})
-            property var behavior: ({})
-            property var caret: ({})
-            property var appearance: ({})
-            property var accessibility: ({})
-            property var progress: ({})
-        }
+        maxBytes: 262144
+        onLoaded: function(text, exists) { root.finishSettingsRead(false, text, exists, "") }
+        onLoadFailed: function(error) { root.finishSettingsRead(false, "", false, error) }
     }
 
-    FileView {
+    QtObject {
+        id: legacySettingsAdapter
+        property int schemaVersion: 1
+        property var test: ({})
+        property var behavior: ({})
+        property var caret: ({})
+        property var appearance: ({})
+        property var accessibility: ({})
+        property var progress: ({})
+    }
+
+    Components.SecureFile {
         id: settingsStore
         path: Quickshell.env("HOME") + "/.config/omarchy/omatype-settings.json"
-        atomicWrites: true
-        blockLoading: true
+        maxBytes: 262144
         watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.loadSettings(true)
+        onWritePendingChanged: if (!writePending) root.settingsWritePending = false
+        onLoaded: function(text, exists) { root.finishSettingsRead(true, text, exists, "") }
+        onLoadFailed: function(error) { root.finishSettingsRead(true, "", false, error) }
         onSaved: {
-            root.settingsWritePending = false
+            root.settingsWritePending = settingsStore.writePending
             root.settingsStatus = ""
         }
         onSaveFailed: function(error) {
-            root.settingsWritePending = false
+            root.settingsWritePending = settingsStore.writePending
             root.settingsStatus = "settings were not saved"
             console.warn("OmaType settings save failed: " + error)
         }
-        adapter: JsonAdapter {
-            id: settingsAdapter
-            property int schemaVersion: 1
-            property var test: ({})
-            property var behavior: ({})
-            property var caret: ({})
-            property var appearance: ({})
-            property var accessibility: ({})
-            property var progress: ({})
-        }
+    }
+
+    QtObject {
+        id: settingsAdapter
+        property int schemaVersion: 1
+        property var test: ({})
+        property var behavior: ({})
+        property var caret: ({})
+        property var appearance: ({})
+        property var accessibility: ({})
+        property var progress: ({})
     }
 
     PanelWindow {
@@ -1308,7 +1430,7 @@ Item {
                     width: surface.width
                     height: surface.height - 104
                     visible: root.progressOpen
-                    history: root.historyDocument() || History.clear()
+                    history: root.historyDocument()
                     currentSetup: ({
                         mode: root.mode,
                         amount: root.amount,

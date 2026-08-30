@@ -42,8 +42,8 @@ test("overlay translates Monkeytype geometry through Omarchy semantic colors", (
     "punctuation",
     "numbers",
     "focusMode",
-    "FileView",
-    "atomicWrites: true",
+    "Components.SecureFile",
+    "maxBytes: 16777216",
     "Canvas",
     "wpm",
     "accuracy",
@@ -213,8 +213,9 @@ test("active runs stay isolated from config reloads and settings remain visible"
     "readonly property var runtimeSettings: root.activeSettings",
     "function loadSettings(syncSetup)",
     "if (syncSetup === true) root.syncStoredTestSettings()",
-    "onFileChanged: reload()",
-    "onLoaded: root.loadSettings(true)",
+    "function finishSettingsRead(current, text, exists, error)",
+    "root.finalizeSettingsStartup()",
+    "watchChanges: true",
     "if (!root.opened) root.loadSettings(true)",
     "if (category === \"test\") root.syncStoredTestSettings()",
     "if (!Settings.isValidUpdate(root.userSettings, category, key, value)) return false",
@@ -247,7 +248,8 @@ test("bar widget uses the supported Quattro bar host contract", () => {
     "bar: root.bar",
     "tooltipText:",
     `root.bar.run("omarchy-shell shell toggle jobo.omatype '{}'")`,
-    "FileView",
+    "Components.SecureFile",
+    "loading history…",
     "lastWpm"
   ]);
   assert.doesNotMatch(q, /signal activated/);

@@ -1,14 +1,17 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "src/history.js" as History
+import "components" as Components
 
 Item {
     id: root
 
     property var bar: null
-    readonly property bool supportedHistorySchema: historyAdapter.schemaVersion === 1 || historyAdapter.schemaVersion === 2
+    property bool historyReady: false
+    property bool historyAvailable: false
+    readonly property bool supportedHistorySchema: root.historyAvailable && (historyAdapter.schemaVersion === 1 || historyAdapter.schemaVersion === 2)
     readonly property var visibleHistoryEntries: historyAdapter.schemaVersion === 1 && historyAdapter.entries.length === 0
         ? historyAdapter.tests : historyAdapter.entries
     readonly property real lastWpm: root.supportedHistorySchema && root.visibleHistoryEntries.length > 0
@@ -17,21 +20,39 @@ Item {
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
 
-    FileView {
+    function finishHistoryRead(text, exists, error) {
+        var document = null
+        if (!error && !exists) document = History.clear()
+        else if (!error) {
+            try { document = History.normalize(JSON.parse(text)) }
+            catch (parseError) { document = null }
+        }
+        root.historyReady = true
+        root.historyAvailable = !!document
+        if (!document) return
+        historyAdapter.schemaVersion = document.schemaVersion
+        historyAdapter.entries = document.entries || []
+        historyAdapter.tests = document.tests || []
+        historyAdapter.rollups = document.rollups || []
+        historyAdapter.archive = document.archive || []
+    }
+
+    Components.SecureFile {
         id: historyStore
         path: Quickshell.env("HOME") + "/.local/state/omarchy/omatype-history.json"
-        atomicWrites: true
-        blockLoading: true
+        maxBytes: 16777216
         watchChanges: true
-        onFileChanged: reload()
-        adapter: JsonAdapter {
-            id: historyAdapter
-            property int schemaVersion: 1
-            property var entries: []
-            property var tests: []
-            property var rollups: []
-            property var archive: []
-        }
+        onLoaded: function(text, exists) { root.finishHistoryRead(text, exists, "") }
+        onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }
+    }
+
+    QtObject {
+        id: historyAdapter
+        property int schemaVersion: 1
+        property var entries: []
+        property var tests: []
+        property var rollups: []
+        property var archive: []
     }
 
     BarIconButton {
@@ -40,7 +61,7 @@ Item {
         bar: root.bar
         text: "󰌌"
         fontFamily: "JetBrainsMono Nerd Font"
-        tooltipText: root.lastWpm > 0 ? "OmaType • " + Math.round(root.lastWpm) + " wpm" : "OmaType"
+        tooltipText: !root.historyReady ? "OmaType • loading history…" : root.lastWpm > 0 ? "OmaType • " + Math.round(root.lastWpm) + " wpm" : "OmaType"
         slotSize: Style.bar.iconSlot
         onPressed: function(mouseButton) {
             if (mouseButton === Qt.LeftButton && root.bar)
