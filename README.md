@@ -37,6 +37,9 @@ OmaType requires an Omarchy installation using the Quattro shell and the system 
 omarchy plugin add https://github.com/OldJobobo/omatype.git --enable
 ```
 
+> [!NOTE]
+> Omarchy’s current add/update commands follow the repository’s mutable branch head; they are not bound to the exact commit checked by the marketplace. Marketplace validation is a limited, commit-specific static check—not a security audit or guarantee.
+
 Once enabled, select **OmaType** from the bar and begin typing. You can also open it directly:
 
 ```sh
@@ -89,7 +92,9 @@ OmaType does not use the network, read credentials, request elevated privileges,
 | Typing history and compacted long-term statistics | `~/.local/state/omarchy/omatype-history.json` |
 | Optional retained-result CSV export | `~/.local/state/omarchy/omatype-history.csv` |
 
-Preferences and history are versioned and validated before use. A settings file from a newer schema is left untouched: OmaType starts with safe in-memory defaults and refuses to overwrite it. Local reads are bounded and accept only owned regular files reached without following symlinks; FIFOs, sockets, directories, oversized content, and invalid UTF-8 are rejected. Saves use OmaType's bundled standard-library Python helper to create a private `0600` temporary file, sync it, and atomically replace the destination without following a destination symlink.
+Preferences and history are versioned and validated before use. A settings file from a newer schema is left untouched: OmaType starts with safe in-memory defaults, cancels queued writes, and refuses to overwrite it. Local reads are bounded and accept only owned regular files reached through owned, non-writable-by-group-or-others directories without following symlinks; FIFOs, sockets, directories, oversized content, invalid UTF-8, and excessive history structures are rejected.
+
+Saves use OmaType’s bundled standard-library Python helper. Revision-checked settings and history writes take an advisory directory lock, verify the exact previously read bytes, create a private `0600` temporary, sync it, recheck destination identity, and atomically publish it. Conflicting history operations are replayed onto the newly loaded document instead of retrying a stale snapshot. CSV export intentionally replaces its own destination without following a symlink and neutralizes spreadsheet-formula prefixes. A non-cooperating process running as the same user can still race after the final identity check; owner-private directories, revision checks, and atomic rename narrow that residual window but cannot provide a kernel-level compare-and-swap.
 
 OmaType retains the newest 2,000 individual runs, then conserves older totals, daily activity, comparable averages, and personal bests in compacted local rollups. A test snapshots its active behavior and setup preferences when it begins, so mid-test changes cannot alter the run already in progress.
 

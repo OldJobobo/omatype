@@ -13,7 +13,8 @@ All notable changes to OmaType are documented here.
 
 - Local history now uses schema v2, retaining 2,000 individual runs before conserving older activity, totals, comparable averages, and personal bests in compacted rollups.
 - Results now persist effective test modifiers, completion reason, metrics version, elapsed time, local day, timezone offset, and bounded interval samples.
-- Local persistence now uses bounded, no-follow descriptor reads and private atomic writes, rejecting symlinks on read, special files, oversized content, invalid UTF-8, and unsafe path components; settings from newer schemas remain untouched.
+- Local persistence now uses bounded, no-follow descriptor reads and private atomic writes, rejecting symlinks on read, special files, oversized content, invalid UTF-8, unsafe path components, and excessive history structures; settings from newer schemas remain untouched.
+- Settings and history saves are revision-checked, conflicting history operations rebase onto the latest document, untrusted seed text is forced to plain rendering, and CSV export neutralizes spreadsheet-formula prefixes.
 
 ## [0.1.0] - 2026-08-28
 
