@@ -25,8 +25,8 @@ ShellRoot {
             history: ({
                 schemaVersion: 2,
                 entries: [
-                    {id: "a", timestamp: "2026-01-01T12:00:00.000Z", localDay: "2026-01-01", timezoneOffsetMinutes: 0, mode: "time", amount: 30, language: "english", punctuation: false, numbers: false, completion: "completed", metricsVersion: 1, elapsedMs: 30000, wpm: 50, rawWpm: 54, accuracy: 98, consistency: 90, characters: 100, correct: 98, errors: 2, corrected: 2, uncorrectedErrors: 0, corrections: 2, seed: "a", samples: [45, 50]},
-                    {id: "b", timestamp: "2026-01-02T12:00:00.000Z", localDay: "2026-01-02", timezoneOffsetMinutes: 0, mode: "words", amount: 25, language: "rust", punctuation: false, numbers: false, completion: "completed", metricsVersion: 1, elapsedMs: 30000, wpm: 90, rawWpm: 94, accuracy: 97, consistency: 88, characters: 100, correct: 97, errors: 3, corrected: 3, uncorrectedErrors: 0, corrections: 3, seed: "b", samples: [85, 90]}
+                    {id: "a", timestamp: "2026-01-01T12:00:00.000Z", localDay: "2026-01-01", timezoneOffsetMinutes: 0, mode: "time", amount: 30, language: "english", punctuation: false, numbers: false, completion: "completed", metricsVersion: 1, elapsedMs: 30000, wpm: 50, rawWpm: 54, accuracy: 98, consistency: 90, characters: 100, correct: 98, errors: 2, corrected: 2, uncorrectedErrors: 0, corrections: 2, seed: "<img src=file:///definitely-not-omatype>", samples: [45, 50]},
+                    {id: "b", timestamp: "2026-01-02T12:00:00.000Z", localDay: "2026-01-02", timezoneOffsetMinutes: 0, mode: "words", amount: 25, language: "rust", punctuation: false, numbers: false, completion: "completed", metricsVersion: 1, elapsedMs: 30000, wpm: 90, rawWpm: 94, accuracy: 97, consistency: 88, characters: 100, correct: 97, errors: 3, corrected: 3, uncorrectedErrors: 0, corrections: 3, seed: "<img src=file:///definitely-not-omatype>", samples: [85, 90]}
                 ],
                 rollups: [],
                 archive: []
@@ -67,12 +67,16 @@ ShellRoot {
             var failed = progress.deleteConfirmId !== "" || progress.clearConfirm || nullChart.validSeries.length !== 0
                 || progress.comparisonSummary.latest !== null || progress.chartSeries.length !== 0
                 || legendChart.validSeries.length !== 2 || !migrated || migrated.entries.length !== 1 || migrated.entries[0].wpm !== 44
+                || progress.selectedDetailTextFormat !== Text.PlainText || progress.selectedDetailText.indexOf("<img src=file:///definitely-not-omatype>") < 0
                 || !filterTargetsOk
-            if (failed) console.error("HARNESS_FAILURE: progress reopen, mixed-scope, filter reveal, or legacy adapter migration contract · delete=" + progress.deleteConfirmId + " clear=" + progress.clearConfirm + " null=" + nullChart.validSeries.length + " latest=" + progress.comparisonSummary.latest + " chart=" + progress.chartSeries.length + " filters=" + filterTargetsOk + " adapterTests=" + legacyHistoryAdapter.tests.length + " migrated=" + (migrated ? migrated.entries.length : -1) + " wpm=" + (migrated && migrated.entries.length ? migrated.entries[0].wpm : -1))
+            if (failed) console.error("HARNESS_FAILURE: progress reopen, mixed-scope, filter reveal, or legacy adapter migration contract · delete=" + progress.deleteConfirmId + " clear=" + progress.clearConfirm + " null=" + nullChart.validSeries.length + " latest=" + progress.comparisonSummary.latest + " chart=" + progress.chartSeries.length + " filters=" + filterTargetsOk + " adapterTests=" + legacyHistoryAdapter.tests.length + " migrated=" + (migrated ? migrated.entries.length : -1) + " wpm=" + (migrated && migrated.entries.length ? migrated.entries[0].wpm : -1) + " detailFormat=" + progress.selectedDetailTextFormat + " plain=" + Text.PlainText + " detail=" + progress.selectedDetailText)
             else console.log("HARNESS_OK: narrow visible progress, exact filter reveal, reopen reset, null chart, and legacy adapter migration contract")
             Qt.quit()
         }
     }
 
-    Component.onCompleted: progress.setScope("all")
+    Component.onCompleted: {
+        progress.setScope("all")
+        progress.period = "all"
+    }
 }

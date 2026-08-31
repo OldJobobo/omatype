@@ -44,6 +44,7 @@ Item {
     property var historyPendingEffects: []
     property var historyWriteSnapshot: null
     property var historyQueuedWrite: null
+    property var historyConflictEffects: []
     property bool historyReloadAfterFailure: false
     property bool historyReady: false
     property bool historyAvailable: false
@@ -174,6 +175,7 @@ Item {
             root.settingsCurrentExists = exists || !!error
             root.settingsCurrentStatus = error ? "unavailable" : !exists ? "absent" : document.status
             root.settingsCurrentValue = value
+            if (root.settingsCurrentStatus === "unsupported") settingsStore.cancelQueuedWrite()
             if (value) root.applySettingsAdapter(settingsAdapter, value)
             if (root.settingsReady && value) root.loadSettings(true)
         } else {
@@ -562,6 +564,17 @@ Item {
         historyAdapter.archive = document.archive || []
     }
 
+    function markCurrentHistoryResultFailed(effects) {
+        for (var effectIndex = 0; effectIndex < effects.length; ++effectIndex) {
+            var effect = effects[effectIndex]
+            if (effect.kind === "result" && root.result && root.result.timestamp === effect.resultTimestamp) {
+                root.resultSaved = false
+                root.resultSaveStatus = "failed"
+                return
+            }
+        }
+    }
+
     function markHistoryWriteStarted(request) {
         var effects = request.effects || []
         var currentResultWillBeSaved = false
@@ -602,19 +615,52 @@ Item {
         }
     }
 
-    function persistHistory(document, operation, resultTimestamp, targetId) {
-        if (!document || document.schemaVersion !== History.SCHEMA_VERSION) return false
+    function historyEffect(kind, resultTimestamp, targetId, resultEntry) {
+        return {
+            kind: kind,
+            resultTimestamp: resultTimestamp || "",
+            targetId: targetId || "",
+            entry: kind === "result" ? History.cleanEntry(resultEntry, History.SCHEMA_VERSION) : null
+        }
+    }
+
+    function applyHistoryEffects(document, effects) {
+        return History.applyEffects(document, effects)
+    }
+
+    function queueHistoryReloadEffects(request) {
+        var combined = root.historyConflictEffects.concat(request.effects || [])
+        if (combined.length > History.MAX_EFFECTS) {
+            root.markCurrentHistoryResultFailed(request.effects || [])
+            progressPanel.statusMessage = "too many history changes are pending · reload OmaType"
+            return false
+        }
+        root.historyConflictEffects = combined
+        root.markHistoryWriteStarted(request)
+        if (!historyStore.readPending) historyStore.reload()
+        return true
+    }
+
+    function persistHistory(document, operation, resultTimestamp, targetId, resultEntry) {
         var kind = operation || "history"
         var request = {
             document: document,
             operation: kind,
             resultTimestamp: resultTimestamp || "",
             targetId: targetId || "",
-            effects: [{kind: kind, resultTimestamp: resultTimestamp || "", targetId: targetId || ""}]
+            effects: [root.historyEffect(kind, resultTimestamp, targetId, resultEntry)]
         }
-        if (root.historyWritePending || root.historyReloadAfterFailure) {
+        if (root.historyReloadAfterFailure) return root.queueHistoryReloadEffects(request)
+        if (!document || document.schemaVersion !== History.SCHEMA_VERSION) return false
+        if (root.historyWritePending) {
+            var newEffects = request.effects
             if (root.historyQueuedWrite && root.historyQueuedWrite.effects)
                 request.effects = root.historyQueuedWrite.effects.concat(request.effects)
+            if (request.effects.length > History.MAX_EFFECTS) {
+                root.markCurrentHistoryResultFailed(newEffects)
+                progressPanel.statusMessage = "too many history changes are pending · reload OmaType"
+                return false
+            }
             root.historyQueuedWrite = request
             root.markHistoryWriteStarted(request)
             return true
@@ -629,14 +675,12 @@ Item {
         root.startHistoryWrite(request)
     }
 
-    function completeHistoryWrite(saved, error) {
+    function completeHistoryWrite(saved, error, conflict) {
         var operation = root.historyPendingOperation
         var resultTimestamp = root.historyPendingResultTimestamp
-        var targetId = root.historyPendingTargetId
         var effects = root.historyPendingEffects || []
         var snapshot = root.historyWriteSnapshot
         if (!saved && snapshot) root.applyHistoryAdapter(snapshot, false)
-        if (!saved) root.historyReloadAfterFailure = true
         root.historyWritePending = false
         root.historyPendingOperation = ""
         root.historyPendingResultTimestamp = ""
@@ -667,22 +711,57 @@ Item {
             root.drainQueuedHistoryWrite()
             return
         }
-        if (operation === "result" && root.result && root.result.timestamp === resultTimestamp) {
-            root.resultSaved = false
-            root.resultSaveStatus = "failed"
+
+        var queuedEffects = root.historyQueuedWrite && root.historyQueuedWrite.effects
+            ? root.historyQueuedWrite.effects : []
+        root.historyQueuedWrite = null
+        var recoveryEffects = (conflict || queuedEffects.length) ? effects.concat(queuedEffects) : []
+        if (recoveryEffects.length > History.MAX_EFFECTS) {
+            root.historyConflictEffects = []
+            root.historyReloadAfterFailure = false
+            root.markCurrentHistoryResultFailed(recoveryEffects)
+            progressPanel.statusMessage = "too many history changes were pending · history was not changed"
+            console.warn("OmaType history save failed: " + error)
+            return
         }
-        if (root.historyQueuedWrite && effects.length)
-            root.historyQueuedWrite.effects = effects.concat(root.historyQueuedWrite.effects || [])
-        progressPanel.statusMessage = root.historyQueuedWrite ? "history save failed · retrying queued changes" : (operation === "result" ? "result was not saved" : operation + " failed · history unchanged on disk")
+        root.historyConflictEffects = recoveryEffects
+        root.historyReloadAfterFailure = true
+        if (!root.historyConflictEffects.length && operation === "result" && root.result && root.result.timestamp === resultTimestamp)
+            root.markCurrentHistoryResultFailed(effects)
+        progressPanel.statusMessage = conflict ? "history changed externally · rebasing local changes" : (root.historyConflictEffects.length ? "history save failed · retrying queued changes" : operation + " failed · history unchanged on disk")
         console.warn("OmaType history save failed: " + error)
         historyStore.reload()
     }
 
     function finishHistoryFailureReload(error) {
         if (!root.historyReloadAfterFailure) return
+        var effects = root.historyConflictEffects.slice()
+        if (error || !root.historyAvailable) {
+            if (error) console.warn("OmaType history reload after save failure failed: " + error)
+            root.markCurrentHistoryResultFailed(effects)
+            progressPanel.statusMessage = "history reload failed · local changes remain pending"
+            return
+        }
+        if (!effects.length) {
+            root.historyReloadAfterFailure = false
+            return
+        }
+        var document = root.applyHistoryEffects(root.historyAdapterDocument(), effects)
+        if (!document) {
+            root.markCurrentHistoryResultFailed(effects)
+            progressPanel.statusMessage = "history rebase failed · local changes remain pending"
+            return
+        }
+        root.historyConflictEffects = []
         root.historyReloadAfterFailure = false
-        if (error) console.warn("OmaType history reload after save failure failed: " + error)
-        root.drainQueuedHistoryWrite()
+        var last = effects[effects.length - 1]
+        root.startHistoryWrite({
+            document: document,
+            operation: last.kind,
+            resultTimestamp: last.resultTimestamp || "",
+            targetId: last.targetId || "",
+            effects: effects
+        })
     }
 
     function finishHistoryRead(text, exists, error) {
@@ -713,7 +792,8 @@ Item {
         var effects = []
         for (var pendingIndex = 0; pendingIndex < pending.length; ++pendingIndex) {
             document = History.add(document, pending[pendingIndex])
-            effects.push({kind: "result", resultTimestamp: pending[pendingIndex].timestamp, targetId: ""})
+            if (!document) break
+            effects.push(root.historyEffect("result", pending[pendingIndex].timestamp, "", pending[pendingIndex]))
         }
         var request = {
             document: document,
@@ -722,9 +802,21 @@ Item {
             targetId: "",
             effects: effects
         }
-        if (root.historyWritePending || root.historyReloadAfterFailure) {
+        if (!document || effects.length > History.MAX_EFFECTS) {
+            if (root.result) root.resultSaveStatus = "failed"
+            progressPanel.statusMessage = "too many unsaved results · history was not changed"
+            return
+        }
+        if (root.historyReloadAfterFailure) root.queueHistoryReloadEffects(request)
+        else if (root.historyWritePending) {
+            var newEffects = request.effects
             if (root.historyQueuedWrite && root.historyQueuedWrite.effects)
                 request.effects = root.historyQueuedWrite.effects.concat(request.effects)
+            if (request.effects.length > History.MAX_EFFECTS) {
+                root.markCurrentHistoryResultFailed(newEffects)
+                progressPanel.statusMessage = "too many unsaved results · history was not changed"
+                return
+            }
             root.historyQueuedWrite = request
             root.markHistoryWriteStarted(request)
         } else root.startHistoryWrite(request)
@@ -817,9 +909,12 @@ Item {
         if (!root.historyReady) {
             resultSaveStatus = "saving"
             root.pendingHistoryResults = root.pendingHistoryResults.concat([summary])
+        } else if (root.historyReloadAfterFailure) {
+            resultSaveStatus = "saving"
+            if (!root.persistHistory(null, "result", summary.timestamp, "", summary)) resultSaveStatus = "failed"
         } else if (currentHistory) {
             resultSaveStatus = "saving"
-            if (!root.persistHistory(History.add(currentHistory, summary), "result", summary.timestamp)) resultSaveStatus = "failed"
+            if (!root.persistHistory(History.add(currentHistory, summary), "result", summary.timestamp, "", summary)) resultSaveStatus = "failed"
         } else resultSaveStatus = "unsupported"
         Qt.callLater(function() { resultChart.requestPaint() })
     }
@@ -864,8 +959,9 @@ Item {
                 root.finishHistoryRead(text, exists, "")
         }
         onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }
-        onSaved: root.completeHistoryWrite(true, "")
-        onSaveFailed: function(error) { root.completeHistoryWrite(false, error) }
+        onSaved: root.completeHistoryWrite(true, "", false)
+        onSaveFailed: function(error) { root.completeHistoryWrite(false, error, false) }
+        onSaveConflict: function(error) { root.completeHistoryWrite(false, error, true) }
     }
 
     QtObject {
@@ -881,6 +977,7 @@ Item {
         id: csvStore
         path: Quickshell.env("HOME") + "/.local/state/omarchy/omatype-history.csv"
         maxBytes: 16777216
+        compareAndSwap: false
         preload: false
         onSaved: {
             root.csvWritePending = false
@@ -892,6 +989,12 @@ Item {
             root.csvStatus = "CSV export failed"
             progressPanel.statusMessage = root.csvStatus
             console.warn("OmaType CSV export failed: " + error)
+        }
+        onSaveConflict: function(error) {
+            root.csvWritePending = false
+            root.csvStatus = "CSV export conflict"
+            progressPanel.statusMessage = root.csvStatus
+            console.warn("OmaType CSV export conflict: " + error)
         }
     }
 
@@ -930,6 +1033,12 @@ Item {
             root.settingsWritePending = settingsStore.writePending
             root.settingsStatus = "settings were not saved"
             console.warn("OmaType settings save failed: " + error)
+        }
+        onSaveConflict: function(error) {
+            settingsStore.cancelQueuedWrite()
+            root.settingsWritePending = false
+            root.settingsStatus = "settings changed externally · local change not saved"
+            console.warn("OmaType settings save conflict: " + error)
         }
     }
 
@@ -1788,6 +1897,7 @@ Item {
                     y: surface.height - 77
                     visible: root.settingsOpen && !root.focusMode
                     text: "seed  " + root.seed + "    retained history  " + historyAdapter.entries.length + "/2000    local only" + (root.settingsStatus ? "    · " + root.settingsStatus : "")
+                    textFormat: Text.PlainText
                     color: root.mutedColor
                     font.family: root.typeface
                     font.pixelSize: 11

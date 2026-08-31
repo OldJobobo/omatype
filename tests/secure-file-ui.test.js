@@ -9,10 +9,11 @@ function includesAll(source, values) {
   for (const value of values) assert.ok(source.includes(value), value);
 }
 
-test("SecureFile uses fixed argv, isolated Python, framed stdin, generations, and timeouts", () => {
+test("SecureFile uses fixed argv, isolated Python, revision CAS, framed stdin, and timeouts", () => {
   const qml = read("components/SecureFile.qml");
   includesAll(qml, [
     '["/usr/bin/python3", "-I", "-S", root.helperPath, operation, root.path, String(root.maxBytes)]',
+    'if (operation === "write") result.push(expectedRevision)',
     "clearEnvironment: true",
     '"HOME": Quickshell.env("HOME")',
     '"LANG": "C.UTF-8"',
@@ -21,11 +22,18 @@ test("SecureFile uses fixed argv, isolated Python, framed stdin, generations, an
     "onStarted: writeProcess.write(writeProcess.frame)",
     "property int requestGeneration: 0",
     "property var queuedWrite: null",
+    'property string revision: "unknown"',
     "property bool readQueued: false",
+    "function cancelQueuedWrite()",
+    "signal saveConflict(string error)",
+    "stdout: StdioCollector { id: readStdout; waitForEnd: true }",
+    "stderr: StdioCollector { id: writeStderr; waitForEnd: true }",
+    'root.queuedWrite = {text: text, chain: true, expectedRevision: ""}',
+    'root.queuedWrite = {text: text, chain: false, expectedRevision: expected}',
     "readProcess.signal(9)",
     "writeProcess.signal(9)"
   ]);
-  assert.doesNotMatch(qml, /(?:bash|sh)\s*,\s*"-c"|execDetached|startDetached/);
+  assert.doesNotMatch(qml, /(?:bash|sh)\s*,\s*"-c"|execDetached|startDetached|SplitParser/);
 });
 
 test("FileView is watcher-only and never carries OmaType content", () => {
@@ -43,7 +51,7 @@ test("all persistence paths use secure caps and explicit normalization", () => {
   const bar = read("BarWidget.qml");
   includesAll(overlay, [
     'id: historyStore', 'maxBytes: 16777216',
-    'id: csvStore',
+    'id: csvStore', 'compareAndSwap: false',
     'id: legacySettingsStore', 'maxBytes: 262144',
     'id: settingsStore',
     'History.normalize(JSON.parse(text))',
@@ -69,8 +77,19 @@ test("future current settings fail closed before normalization or persistence", 
   includesAll(qml, [
     'property string settingsCurrentStatus: "pending"',
     'root.settingsCurrentStatus = error ? "unavailable" : !exists ? "absent" : document.status',
-    'settings use a newer schema · changes not saved'
+    'settings use a newer schema · changes not saved',
+    'if (root.settingsCurrentStatus === "unsupported") settingsStore.cancelQueuedWrite()',
+    'onSaveConflict: function(error)'
   ]);
+});
+
+test("IPC and history seed text sinks force literal plain text", () => {
+  const overlay = read("OmaType.qml");
+  const progress = read("components/progress/ProgressView.qml");
+  const footer = overlay.slice(overlay.indexOf('text: "seed  " + root.seed'), overlay.indexOf("}", overlay.indexOf('text: "seed  " + root.seed')));
+  const selected = progress.slice(progress.indexOf("text: root.selectedEntry ?"), progress.indexOf("ProgressChart {", progress.indexOf("text: root.selectedEntry ?")));
+  includesAll(footer, ["textFormat: Text.PlainText"]);
+  includesAll(selected, ["root.selectedEntry.seed", "textFormat: Text.PlainText"]);
 });
 
 test("async startup coordinates both settings sources and queues history results", () => {

@@ -49,6 +49,8 @@ Rectangle {
     readonly property var languageOptions: ["current", "all"].concat(root.availableFilters.languages)
     readonly property var modeOptions: ["current", "all"].concat(root.availableFilters.modes)
     readonly property var amountOptions: root.buildAmountOptions()
+    readonly property int selectedDetailTextFormat: selectedDetail.textFormat
+    readonly property string selectedDetailText: selectedDetail.text
 
     signal closeRequested()
     signal deleteRequested(string id)
@@ -510,12 +512,14 @@ Rectangle {
                         onActivated: root.requestDelete()
                     }
                     Text {
+                        id: selectedDetail
                         x: 14; y: 54; width: parent.width - 28
                         text: root.selectedEntry ? root.selectedEntry.mode + " " + root.selectedEntry.amount + " · " + root.selectedEntry.language
                             + "\n" + Math.round(root.selectedEntry.wpm) + " net / " + Math.round(root.selectedEntry.rawWpm) + " raw · " + Number(root.selectedEntry.accuracy).toFixed(1) + "% accuracy"
                             + "\n" + root.selectedEntry.correct + " correct · " + root.selectedEntry.errors + " errors · " + root.selectedEntry.corrections + " corrections"
                             + "\n" + Math.round(Number(root.selectedEntry.elapsedMs || 0) / 1000) + " sec · " + root.selectedEntry.completion + " · seed " + root.selectedEntry.seed
                             : "Select a retained result to inspect exact details. Compacted history contributes to totals but cannot be individually selected."
+                        textFormat: Text.PlainText
                         color: root.textColor; font.family: root.fontFamily; font.pixelSize: 11; lineHeight: 1.35; wrapMode: Text.Wrap; elide: Text.ElideRight; maximumLineCount: 4
                     }
                     ProgressChart {

@@ -58,15 +58,17 @@ test("adding results replaces a duplicate id and keeps newest first", () => {
 });
 
 test("history retains two thousand raw entries and compacts overflow without losing totals or PB", () => {
-  const input = [];
-  for (let index = 0; index < 2005; index++) input.push(run(index, {wpm: index === 0 ? 500 : 50}));
-  const history = History.normalize({schemaVersion: 2, entries: input});
+  const oldest = run(0, {wpm: 500});
+  const initial = [oldest];
+  for (let index = 1; index < 2001; index++) initial.push(run(index, {wpm: 50}));
+  let history = History.normalize({schemaVersion: 2, entries: initial});
+  for (let index = 2001; index < 2005; index++) history = History.add(history, run(index, {wpm: 50}));
   assert.equal(history.entries.length, History.MAX_ENTRIES);
   assert.equal(history.rollups.reduce((sum, value) => sum + value.count, 0), 5);
   assert.equal(history.entries.length + history.rollups.reduce((sum, value) => sum + value.count, 0), 2005);
   const bestRollup = history.rollups.find(value => value.maxWpm === 500);
   assert.ok(bestRollup);
-  assert.equal(bestRollup.maxWpmTimestamp, input[0].timestamp);
+  assert.equal(bestRollup.maxWpmTimestamp, oldest.timestamp);
   assert.deepEqual(History.normalize(history), history);
 });
 
@@ -165,6 +167,23 @@ test("selective deletion only removes retained raw results and clear removes all
   assert.deepEqual(History.clear(), {schemaVersion: 2, entries: [], rollups: [], archive: []});
 });
 
+test("operation effects rebase result, delete, and clear ordering onto external history", () => {
+  const external = History.normalize({schemaVersion: 2, entries: [run(0, {id: "external"})]});
+  const added = run(1, {id: "local-result"});
+  const rebased = History.applyEffects(external, [
+    {kind: "result", entry: added},
+    {kind: "delete", targetId: "external"}
+  ]);
+  assert.deepEqual(rebased.entries.map(entry => entry.id), ["local-result"]);
+  const clearThenResult = History.applyEffects(external, [
+    {kind: "clear"},
+    {kind: "result", entry: added}
+  ]);
+  assert.deepEqual(clearThenResult.entries.map(entry => entry.id), ["local-result"]);
+  assert.equal(History.applyEffects({schemaVersion: 99}, [{kind: "clear"}]), null);
+  assert.equal(History.applyEffects(external, Array(History.MAX_EFFECTS + 1).fill({kind: "clear"})), null);
+});
+
 test("serialized full-document queue preserves coalesced mutations across rollback", () => {
   const base = History.normalize({schemaVersion: 2, entries: [run(0)], rollups: [], archive: []});
   const firstResult = run(1, {id: "first-queued"});
@@ -184,4 +203,73 @@ test("CSV serialization escapes values and exports retained raw rows only", () =
   assert.match(csv, /^id,timestamp,/);
   assert.match(csv, /"comma,""quote"""/);
   assert.equal(csv.trim().split("\n").length, 2);
+});
+
+test("CSV serialization neutralizes spreadsheet formula prefixes before RFC4180 quoting", () => {
+  for (const seed of ["=1+1", "+cmd", "-2+3", "@SUM(A1)", "\t=1", "\r=1", "\n=1", "  =1", ' =1,"quoted"']) {
+    const csv = History.toCsv(History.add(History.clear(), run(0, {seed})));
+    const row = csv.trimEnd().split("\n").slice(1).join("\n");
+    assert.ok(row.includes("'"), seed);
+    assert.doesNotMatch(row.split(",").at(-1), /^(?:\s*)[=+\-@]/, seed);
+  }
+  const benign = History.toCsv(History.add(History.clear(), run(0, {seed: "safe value"})));
+  assert.match(benign, /,safe value\n$/);
+});
+
+test("hostile history sequences are rejected or sliced without attacker-sized iteration", () => {
+  let reads = 0;
+  const million = new Proxy({length: 1000000}, {get(target, key) {
+    if (key !== "length") reads++;
+    return target[key];
+  }});
+  const started = Date.now();
+  assert.equal(History.normalize({schemaVersion: 2, entries: million}), null);
+  assert.equal(reads, 0);
+  const entry = History.cleanEntry({samples: million});
+  assert.equal(entry.samples.length, 0);
+  assert.equal(reads, History.MAX_SAMPLES);
+  assert.ok(Date.now() - started < 250, "bounded hostile sequence handling");
+});
+
+test("final archive cardinality fails closed instead of silently dropping compacted totals", () => {
+  const archive = Array.from({length: History.MAX_ARCHIVE}, (_, index) => ({
+    localDay: null,
+    mode: "time",
+    amount: 30,
+    language: History.LANGUAGE_IDS[Math.floor(index / 1000) % History.LANGUAGE_IDS.length],
+    punctuation: index >= 12000,
+    numbers: false,
+    metricsVersion: index % 1000 + 1,
+    completion: "completed",
+    count: 1,
+    qualifiedCount: 1,
+    totalElapsedMs: 1000,
+    latestTimestamp: new Date(1700000000000 + index).toISOString()
+  }));
+  const rollups = ["2026-01-01", "2026-01-02"].map((localDay, index) => ({
+    localDay,
+    mode: "time",
+    amount: 30,
+    language: "english",
+    punctuation: false,
+    numbers: true,
+    metricsVersion: 1,
+    completion: "completed",
+    count: 1,
+    qualifiedCount: 1,
+    totalElapsedMs: 1000,
+    latestTimestamp: `2027-01-0${index + 1}T00:00:00.000Z`
+  }));
+  assert.equal(History.normalize({schemaVersion: 2, entries: [], rollups, archive}, {maxRollups: 1}), null);
+});
+
+test("source tier cardinalities fail closed while one entry overflow still compacts", () => {
+  const entries = Array.from({length: History.MAX_ENTRIES + 1}, (_, index) => run(index));
+  const compacted = History.normalize({schemaVersion: 2, entries});
+  assert.equal(compacted.entries.length, History.MAX_ENTRIES);
+  assert.equal(compacted.rollups.reduce((sum, value) => sum + value.count, 0), 1);
+  assert.equal(History.normalize({schemaVersion: 2, entries: entries.concat(run(9999))}), null);
+  assert.equal(History.normalize({schemaVersion: 2, rollups: Array(History.MAX_ROLLUPS + 1).fill({})}), null);
+  assert.equal(History.normalize({schemaVersion: 2, archive: Array(History.MAX_ARCHIVE + 1).fill({})}), null);
+  assert.ok(compacted.archive.length <= History.MAX_ARCHIVE);
 });
