@@ -3,7 +3,9 @@
 const SCHEMA_VERSION = 2;
 const MAX_ENTRIES = 2000;
 const MAX_ROLLUPS = 20000;
+const MAX_ARCHIVE = 20000;
 const MAX_SAMPLES = 600;
+const MAX_EFFECTS = 1000;
 const MODES = ["time", "words"];
 const AMOUNTS = {time: [15, 30, 60, 120], words: [10, 25, 50, 100]};
 const COMPLETIONS = ["completed", "quick-ended", "legacy-unknown"];
@@ -20,12 +22,18 @@ function object(value) {
 }
 
 // JsonAdapter exposes JSON arrays as QML sequences in some Qt runtimes.
-// Copy bounded indexed sequences so schema-v1 `tests` and v2 tiers normalize identically.
-function list(value) {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== "object" || !Number.isInteger(value.length) || value.length < 0 || value.length > 1000000) return [];
+// Copy only the bounded prefix; never trust or iterate an attacker-supplied length.
+function list(value, maximum, rejectOversize) {
+  const limit = Math.max(0, Math.floor(Number(maximum) || 0));
+  if (Array.isArray(value)) {
+    if (rejectOversize && value.length > limit) return null;
+    return value.slice(0, limit);
+  }
+  if (!value || typeof value !== "object" || !Number.isInteger(value.length) || value.length < 0) return [];
+  if (rejectOversize && value.length > limit) return null;
+  const count = Math.min(value.length, limit);
   const result = [];
-  for (let index = 0; index < value.length; index++) result.push(value[index]);
+  for (let index = 0; index < count; index++) result.push(value[index]);
   return result;
 }
 
@@ -82,9 +90,9 @@ function deterministicId(entry) {
 }
 
 function cleanSamples(value) {
-  return list(value).map(function(sample) { return finite(sample, 0, 9999, null); })
-    .filter(function(sample) { return sample !== null; })
-    .slice(0, MAX_SAMPLES);
+  return list(value, MAX_SAMPLES, false)
+    .map(function(sample) { return finite(sample, 0, 9999, null); })
+    .filter(function(sample) { return sample !== null; });
 }
 
 function cleanEntry(entry, sourceSchemaVersion) {
@@ -280,8 +288,10 @@ function normalize(raw, limits) {
   const requestedLimits = object(limits) || {};
   const entryLimit = Math.max(1, Math.min(MAX_ENTRIES, Math.round(finite(requestedLimits.maxEntries, 1, MAX_ENTRIES, MAX_ENTRIES))));
   const rollupLimit = Math.max(1, Math.min(MAX_ROLLUPS, Math.round(finite(requestedLimits.maxRollups, 1, MAX_ROLLUPS, MAX_ROLLUPS))));
-  const entriesList = list(source.entries);
-  const sourceEntries = entriesList.length ? entriesList : list(source.tests);
+  const entriesList = list(source.entries, MAX_ENTRIES + 1, true);
+  const legacyTests = entriesList && entriesList.length ? [] : list(source.tests, MAX_ENTRIES + 1, true);
+  if (entriesList === null || legacyTests === null) return null;
+  const sourceEntries = entriesList.length ? entriesList : legacyTests;
   const seen = {};
   const entries = [];
   sourceEntries.forEach(function(value) {
@@ -295,7 +305,9 @@ function normalize(raw, limits) {
   const byKey = {};
   const archiveByKey = {};
   if (sourceSchemaVersion === SCHEMA_VERSION) {
-    list(source.rollups).forEach(function(value) {
+    const sourceRollups = list(source.rollups, MAX_ROLLUPS, true);
+    if (sourceRollups === null) return null;
+    sourceRollups.forEach(function(value) {
       const rollup = cleanRollup(value);
       if (!rollup || rollup.count <= 0) return;
       const key = rollupKey(rollup);
@@ -303,7 +315,9 @@ function normalize(raw, limits) {
     });
   }
   if (sourceSchemaVersion === SCHEMA_VERSION) {
-    list(source.archive).forEach(function(value) {
+    const sourceArchive = list(source.archive, MAX_ARCHIVE, true);
+    if (sourceArchive === null) return null;
+    sourceArchive.forEach(function(value) {
       const rollup = cleanRollup(value);
       if (!rollup || rollup.count <= 0) return;
       rollup.localDay = null;
@@ -326,6 +340,7 @@ function normalize(raw, limits) {
   const rollups = allRollups.slice(0, rollupLimit);
   const archive = Object.keys(archiveByKey).map(function(key) { return archiveByKey[key]; })
     .sort(function(a, b) { return String(b.latestTimestamp).localeCompare(String(a.latestTimestamp)); });
+  if (archive.length > MAX_ARCHIVE) return null;
   return {schemaVersion: SCHEMA_VERSION, entries: entries.slice(0, entryLimit), rollups, archive};
 }
 
@@ -350,13 +365,29 @@ function remove(raw, id) {
   return {history, deleted: false, reason: compacted ? "compacted" : "missing"};
 }
 
+function applyEffects(raw, effects) {
+  let history = normalize(raw);
+  const effectList = list(effects, MAX_EFFECTS, true);
+  if (!history || effectList === null) return null;
+  for (const effect of effectList) {
+    const value = object(effect);
+    if (!value) continue;
+    if (value.kind === "result" && value.entry) history = add(history, value.entry);
+    else if (value.kind === "delete") history = remove(history, value.targetId).history;
+    else if (value.kind === "clear") history = clear();
+    if (!history) return null;
+  }
+  return normalize(history);
+}
+
 function clear() {
   return {schemaVersion: SCHEMA_VERSION, entries: [], rollups: [], archive: []};
 }
 
 function csvCell(value) {
   if (value === null || value === undefined) return "";
-  const text = String(value);
+  let text = String(value);
+  if (/^[\t\r\n]/.test(text) || /^[\s\u0000-\u001f]*[=+\-@]/.test(text)) text = "'" + text;
   return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
 }
 
@@ -374,8 +405,8 @@ function toCsv(raw) {
 }
 
 const api = {
-  SCHEMA_VERSION, MAX_ENTRIES, MAX_ROLLUPS, MAX_SAMPLES, MODES, AMOUNTS, LANGUAGE_IDS,
-  normalize, add, remove, clear, cleanEntry, cleanRollup, cohortKey, isQualified,
+  SCHEMA_VERSION, MAX_ENTRIES, MAX_ROLLUPS, MAX_ARCHIVE, MAX_SAMPLES, MAX_EFFECTS, MODES, AMOUNTS, LANGUAGE_IDS,
+  normalize, add, remove, applyEffects, clear, cleanEntry, cleanRollup, cohortKey, isQualified,
   localDayAt, deterministicId, toCsv
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;

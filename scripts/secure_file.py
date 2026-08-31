@@ -1,13 +1,15 @@
 #!/usr/bin/python3
-"""Bounded, no-follow persistence helper for OmaType.
+"""Bounded, revision-safe persistence helper for OmaType.
 
-The QML caller passes only an operation, an allowlisted absolute path, and a
-bounded byte limit. File contents are transferred over stdio, never argv.
+The QML caller passes only an operation, an allowlisted absolute path, a bounded
+byte limit, and (for writes) an expected revision. Contents travel over stdio.
 """
 
 from __future__ import annotations
 
 import errno
+import fcntl
+import hashlib
 import os
 import secrets
 import select
@@ -22,6 +24,7 @@ EXIT_UNSAFE = 4
 EXIT_IO = 5
 EXIT_ENCODING = 6
 EXIT_FRAME = 7
+EXIT_CONFLICT = 8
 
 SETTINGS_CAP = 262_144
 LARGE_CAP = 16_777_216
@@ -34,6 +37,7 @@ TARGETS = {
 DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 READ_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
 WRITE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
+REVISION_RE = __import__("re").compile(r"^[0-9a-f]{64}$")
 
 
 class BoundaryError(Exception):
@@ -47,10 +51,19 @@ def fail(message: str, code: int) -> int:
     return code
 
 
-def checked_request(argv: list[str]) -> tuple[str, str, tuple[str, ...], int]:
-    if len(argv) != 4 or argv[1] not in {"read", "write"}:
-        raise BoundaryError("usage: secure_file.py read|write PATH CAP", EXIT_USAGE)
+def control_revision(revision: str) -> None:
+    print(f"revision:{revision}", file=sys.stderr)
+
+
+def checked_request(argv: list[str]) -> tuple[str, str, tuple[str, ...], int, str]:
+    if len(argv) not in {4, 5} or argv[1] not in {"read", "write"}:
+        raise BoundaryError("usage: secure_file.py read PATH CAP | write PATH CAP EXPECTED", EXIT_USAGE)
     operation, path = argv[1], argv[2]
+    if (operation == "read") != (len(argv) == 4):
+        raise BoundaryError("invalid operation arguments", EXIT_USAGE)
+    expected = argv[4] if operation == "write" else ""
+    if operation == "write" and expected not in {"absent", "any"} and not REVISION_RE.fullmatch(expected):
+        raise BoundaryError("invalid expected revision", EXIT_USAGE)
     try:
         cap = int(argv[3], 10)
     except ValueError as error:
@@ -68,13 +81,14 @@ def checked_request(argv: list[str]) -> tuple[str, str, tuple[str, ...], int]:
     allowed_cap = TARGETS.get(parts)
     if allowed_cap is None or cap <= 0 or cap > allowed_cap:
         raise BoundaryError("target path or byte cap is not allowed")
-    return operation, home, parts, cap
+    return operation, home, parts, cap, expected
 
 
 def verify_directory(fd: int) -> None:
     info = os.fstat(fd)
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid():
-        raise BoundaryError("path component is not an owned directory")
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+            or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH)):
+        raise BoundaryError("path component is not a private owned directory")
 
 
 def open_parent(home: str, parts: tuple[str, ...], create: bool) -> tuple[int, str]:
@@ -129,18 +143,37 @@ def read_all(fd: int, cap: int) -> bytes:
     return data
 
 
+def descriptor_bytes(fd: int, cap: int) -> bytes:
+    os.lseek(fd, 0, os.SEEK_SET)
+    return read_all(fd, cap)
+
+
+def revision(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def owned_regular(info: os.stat_result) -> bool:
+    return stat.S_ISREG(info.st_mode) and info.st_uid == os.geteuid()
+
+
 def read_target(home: str, parts: tuple[str, ...], cap: int) -> int:
-    parent, name = open_parent(home, parts, False)
+    try:
+        parent, name = open_parent(home, parts, False)
+    except BoundaryError as error:
+        if error.code == EXIT_ABSENT:
+            control_revision("absent")
+        raise
     fd = -1
     try:
         try:
             fd = os.open(name, READ_FLAGS, dir_fd=parent)
         except FileNotFoundError as error:
+            control_revision("absent")
             raise BoundaryError("target does not exist", EXIT_ABSENT) from error
         except OSError as error:
             raise BoundaryError(f"cannot open target safely: {error.strerror}") from error
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid():
+        if not owned_regular(info):
             raise BoundaryError("target is not an owned regular file")
         if info.st_size > cap:
             raise BoundaryError("file exceeds byte cap")
@@ -149,6 +182,7 @@ def read_target(home: str, parts: tuple[str, ...], cap: int) -> int:
             text = data.decode("utf-8", "strict")
         except UnicodeDecodeError as error:
             raise BoundaryError("file is not valid UTF-8", EXIT_ENCODING) from error
+        control_revision(revision(data))
         sys.stdout.write(text)
         return EXIT_OK
     finally:
@@ -196,13 +230,6 @@ def read_frame(cap: int) -> bytes:
             raise BoundaryError("truncated write frame", EXIT_FRAME)
         chunks.append(chunk)
         remaining -= len(chunk)
-    # The QML pipe remains open. A short grace period catches bytes appended to
-    # the single frame without requiring EOF from the long-lived Process API.
-    ready, _, _ = select.select([input_fd], [], [], 0.05)
-    if ready:
-        extra = os.read(input_fd, 1)
-        if extra:
-            raise BoundaryError("extra bytes after write frame", EXIT_FRAME)
     data = b"".join(chunks)
     try:
         data.decode("utf-8", "strict")
@@ -221,45 +248,131 @@ def write_all(fd: int, data: bytes) -> None:
         written += count
 
 
-def write_target(home: str, parts: tuple[str, ...], cap: int) -> int:
+def current_target(parent: int, name: str, cap: int) -> tuple[str, int, os.stat_result | None]:
+    try:
+        fd = os.open(name, READ_FLAGS, dir_fd=parent)
+    except FileNotFoundError:
+        return "absent", -1, None
+    except OSError as error:
+        raise BoundaryError(f"destination cannot be opened safely: {error.strerror}", EXIT_CONFLICT) from error
+    try:
+        info = os.fstat(fd)
+        if not owned_regular(info) or info.st_size > cap:
+            raise BoundaryError("destination is not an allowed owned regular file", EXIT_CONFLICT)
+        try:
+            data = read_all(fd, cap)
+        except BoundaryError as error:
+            raise BoundaryError("destination changed while reading", EXIT_CONFLICT) from error
+        return revision(data), fd, info
+    except Exception:
+        os.close(fd)
+        raise
+
+
+def same_path_identity(parent: int, name: str, expected: os.stat_result | None) -> bool:
+    try:
+        actual = os.stat(name, dir_fd=parent, follow_symlinks=False)
+    except FileNotFoundError:
+        return expected is None
+    if expected is None:
+        return False
+    return (owned_regular(actual) and actual.st_dev == expected.st_dev
+            and actual.st_ino == expected.st_ino and actual.st_uid == expected.st_uid)
+
+
+def same_parent_identity(home: str, parts: tuple[str, ...], parent: int, name: str) -> bool:
+    current = -1
+    try:
+        current, current_name = open_parent(home, parts, False)
+        expected = os.fstat(parent)
+        actual = os.fstat(current)
+        return (current_name == name and actual.st_dev == expected.st_dev
+                and actual.st_ino == expected.st_ino and actual.st_uid == expected.st_uid)
+    except (BoundaryError, OSError):
+        return False
+    finally:
+        if current >= 0:
+            os.close(current)
+
+
+def before_publish(_parent: int, _name: str) -> None:
+    """Test seam invoked before the final descriptor/path correspondence check."""
+
+
+def write_target(home: str, parts: tuple[str, ...], cap: int, expected: str) -> int:
     data = read_frame(cap)
     parent, name = open_parent(home, parts, True)
     temp_name = ""
-    fd = -1
+    temp_fd = -1
+    current_fd = -1
+    current_info = None
     try:
-        try:
-            existing = os.stat(name, dir_fd=parent, follow_symlinks=False)
-        except FileNotFoundError:
-            existing = None
-        if existing is not None:
-            if stat.S_ISLNK(existing.st_mode):
-                pass  # rename below replaces the link itself; it is never followed.
-            elif not stat.S_ISREG(existing.st_mode) or existing.st_uid != os.geteuid():
-                raise BoundaryError("destination is not an owned regular file")
+        fcntl.flock(parent, fcntl.LOCK_EX)
+        if expected == "any":
+            try:
+                initial = os.stat(name, dir_fd=parent, follow_symlinks=False)
+            except FileNotFoundError:
+                initial = None
+            if initial is not None and not stat.S_ISLNK(initial.st_mode):
+                if not owned_regular(initial):
+                    raise BoundaryError("destination is not replaceable")
+                current_revision, current_fd, current_info = current_target(parent, name, cap)
+            else:
+                current_revision = "absent" if initial is None else "symlink"
+                current_info = initial
+        else:
+            current_revision, current_fd, current_info = current_target(parent, name, cap)
+            if current_revision != expected:
+                raise BoundaryError("destination revision conflict", EXIT_CONFLICT)
+
         for _ in range(32):
             candidate = f".{name}.tmp-{secrets.token_hex(12)}"
             try:
-                fd = os.open(candidate, WRITE_FLAGS, 0o600, dir_fd=parent)
+                temp_fd = os.open(candidate, WRITE_FLAGS, 0o600, dir_fd=parent)
                 temp_name = candidate
                 break
             except FileExistsError:
                 continue
-        if fd < 0:
+        if temp_fd < 0:
             raise BoundaryError("cannot allocate exclusive temporary file", EXIT_IO)
-        os.fchmod(fd, 0o600)
-        write_all(fd, data)
-        os.fsync(fd)
-        os.close(fd)
-        fd = -1
+        os.fchmod(temp_fd, 0o600)
+        write_all(temp_fd, data)
+        os.fsync(temp_fd)
+        os.close(temp_fd)
+        temp_fd = -1
+
+        before_publish(parent, name)
+        if not same_parent_identity(home, parts, parent, name):
+            raise BoundaryError("parent directory changed before publish", EXIT_CONFLICT)
+        if expected == "any" and current_revision == "symlink":
+            try:
+                final_info = os.stat(name, dir_fd=parent, follow_symlinks=False)
+            except FileNotFoundError:
+                raise BoundaryError("destination changed before publish", EXIT_CONFLICT)
+            if not stat.S_ISLNK(final_info.st_mode) or final_info.st_dev != current_info.st_dev or final_info.st_ino != current_info.st_ino:
+                raise BoundaryError("destination changed before publish", EXIT_CONFLICT)
+        elif not same_path_identity(parent, name, current_info):
+            raise BoundaryError("destination changed before publish", EXIT_CONFLICT)
+        if current_fd >= 0:
+            try:
+                final_revision = revision(descriptor_bytes(current_fd, cap))
+            except BoundaryError as error:
+                raise BoundaryError("destination changed before publish", EXIT_CONFLICT) from error
+            if final_revision != current_revision:
+                raise BoundaryError("destination changed before publish", EXIT_CONFLICT)
+
         os.rename(temp_name, name, src_dir_fd=parent, dst_dir_fd=parent)
         temp_name = ""
         os.fsync(parent)
+        control_revision(revision(data))
         return EXIT_OK
     except OSError as error:
         raise BoundaryError(f"secure write failed: {error.strerror}", EXIT_IO) from error
     finally:
-        if fd >= 0:
-            os.close(fd)
+        if current_fd >= 0:
+            os.close(current_fd)
+        if temp_fd >= 0:
+            os.close(temp_fd)
         if temp_name:
             try:
                 os.unlink(temp_name, dir_fd=parent)
@@ -270,10 +383,10 @@ def write_target(home: str, parts: tuple[str, ...], cap: int) -> int:
 
 def main(argv: list[str]) -> int:
     try:
-        operation, home, parts, cap = checked_request(argv)
+        operation, home, parts, cap, expected = checked_request(argv)
         if operation == "read":
             return read_target(home, parts, cap)
-        return write_target(home, parts, cap)
+        return write_target(home, parts, cap, expected)
     except BoundaryError as error:
         return fail(str(error), error.code)
     except OSError as error:

@@ -9,9 +9,11 @@ Item {
     property int maxBytes: 0
     property bool preload: true
     property bool watchChanges: false
+    property bool compareAndSwap: true
     property int timeoutMs: 7000
     property bool ready: false
     property bool exists: false
+    property string revision: "unknown"
     property bool readPending: readProcess.running
     property bool writePending: writeProcess.running || root.queuedWrite !== null
     property int requestGeneration: 0
@@ -25,17 +27,31 @@ Item {
     signal loadFailed(string error)
     signal saved()
     signal saveFailed(string error)
+    signal saveConflict(string error)
 
     width: 0
     height: 0
     visible: false
 
-    function command(operation) {
-        return ["/usr/bin/python3", "-I", "-S", root.helperPath, operation, root.path, String(root.maxBytes)]
+    function command(operation, expectedRevision) {
+        var result = ["/usr/bin/python3", "-I", "-S", root.helperPath, operation, root.path, String(root.maxBytes)]
+        if (operation === "write") result.push(expectedRevision)
+        return result
     }
 
     function utf8Length(text) {
         return unescape(encodeURIComponent(text)).length
+    }
+
+    function controlRevision(text) {
+        var match = String(text || "").match(/(?:^|\n)revision:(absent|[0-9a-f]{64})(?:\n|$)/)
+        return match ? match[1] : ""
+    }
+
+    function controlError(text) {
+        return String(text || "").split("\n").filter(function(line) {
+            return line && !/^revision:(?:absent|[0-9a-f]{64})$/.test(line)
+        }).join(" · ").trim()
     }
 
     function reload() {
@@ -51,10 +67,8 @@ Item {
         root.readQueued = false
         root.requestGeneration++
         readProcess.generation = root.requestGeneration
-        readProcess.output = ""
-        readProcess.errorOutput = ""
         readProcess.timedOut = false
-        readProcess.command = root.command("read")
+        readProcess.command = root.command("read", "")
         readProcess.running = true
         readTimeout.restart()
         return true
@@ -62,14 +76,31 @@ Item {
 
     function save(text) {
         if (!root.path || root.maxBytes <= 0 || typeof text !== "string") return false
-        if (readProcess.running || writeProcess.running) {
-            root.queuedWrite = text
+        var expected = root.compareAndSwap ? root.revision : "any"
+        if (writeProcess.running) {
+            root.queuedWrite = {text: text, chain: true, expectedRevision: ""}
             return true
         }
-        return root.startWrite(text)
+        if (readProcess.running) {
+            root.queuedWrite = {text: text, chain: false, expectedRevision: expected}
+            return true
+        }
+        return root.startWrite({text: text, chain: false, expectedRevision: expected})
     }
 
-    function startWrite(text) {
+    function cancelQueuedWrite() {
+        var cancelled = root.queuedWrite !== null
+        root.queuedWrite = null
+        return cancelled
+    }
+
+    function startWrite(request) {
+        var text = request.text
+        var expected = request.chain ? root.revision : request.expectedRevision
+        if (root.compareAndSwap && expected !== "absent" && !/^[0-9a-f]{64}$/.test(expected)) {
+            root.saveFailed("secure write has no current revision")
+            return false
+        }
         var byteLength = 0
         try { byteLength = root.utf8Length(text) }
         catch (error) {
@@ -84,9 +115,9 @@ Item {
         writeProcess.generation = root.requestGeneration
         writeProcess.payload = text
         writeProcess.frame = String(byteLength) + "\n" + text
-        writeProcess.errorOutput = ""
+        writeProcess.expectedRevision = root.compareAndSwap ? expected : "any"
         writeProcess.timedOut = false
-        writeProcess.command = root.command("write")
+        writeProcess.command = root.command("write", writeProcess.expectedRevision)
         writeProcess.running = true
         writeTimeout.restart()
         return true
@@ -156,27 +187,30 @@ Item {
     Process {
         id: readProcess
         property int generation: 0
-        property string output: ""
-        property string errorOutput: ""
         property bool timedOut: false
         clearEnvironment: true
         environment: root.processEnvironment
-        stdout: SplitParser { onRead: function(data) { readProcess.output += data } }
-        stderr: SplitParser { onRead: function(data) { readProcess.errorOutput += data } }
+        stdout: StdioCollector { id: readStdout; waitForEnd: true }
+        stderr: StdioCollector { id: readStderr; waitForEnd: true }
         onExited: function(exitCode) {
             readTimeout.stop()
             if (readProcess.generation !== root.requestGeneration) return
             root.ready = true
+            var nextRevision = root.controlRevision(readStderr.text)
             if (readProcess.timedOut) {
+                root.revision = "unknown"
                 root.loadFailed("secure read timed out")
-            } else if (exitCode === 0) {
+            } else if (exitCode === 0 && nextRevision) {
+                root.revision = nextRevision
                 root.exists = true
-                root.loaded(readProcess.output, true)
-            } else if (exitCode === 3) {
+                root.loaded(readStdout.text, true)
+            } else if (exitCode === 3 && nextRevision === "absent") {
+                root.revision = "absent"
                 root.exists = false
                 root.loaded("", false)
             } else {
-                root.loadFailed(readProcess.errorOutput.trim() || "secure read failed")
+                root.revision = "unknown"
+                root.loadFailed(root.controlError(readStderr.text) || "secure read failed")
             }
             Qt.callLater(root.continueQueue)
         }
@@ -187,26 +221,34 @@ Item {
         property int generation: 0
         property string payload: ""
         property string frame: ""
-        property string errorOutput: ""
+        property string expectedRevision: ""
         property bool timedOut: false
         clearEnvironment: true
         environment: root.processEnvironment
         stdinEnabled: true
-        stderr: SplitParser { onRead: function(data) { writeProcess.errorOutput += data } }
+        stderr: StdioCollector { id: writeStderr; waitForEnd: true }
         onStarted: writeProcess.write(writeProcess.frame)
         onExited: function(exitCode) {
             writeTimeout.stop()
             writeProcess.payload = ""
             writeProcess.frame = ""
             if (writeProcess.generation !== root.requestGeneration) return
+            var nextRevision = root.controlRevision(writeStderr.text)
             if (writeProcess.timedOut) root.saveFailed("secure write timed out")
-            else if (exitCode === 0) {
+            else if (exitCode === 0 && nextRevision) {
+                root.revision = nextRevision
+                root.exists = true
                 if (root.watchChanges) {
                     root.readQueued = true
                     root.rearmWatcher()
                 }
                 root.saved()
-            } else root.saveFailed(writeProcess.errorOutput.trim() || "secure write failed")
+            } else if (exitCode === 8) {
+                root.queuedWrite = null
+                root.readQueued = true
+                root.revision = "unknown"
+                root.saveConflict(root.controlError(writeStderr.text) || "destination revision conflict")
+            } else root.saveFailed(root.controlError(writeStderr.text) || "secure write failed")
             Qt.callLater(root.continueQueue)
         }
     }

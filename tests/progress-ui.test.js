@@ -12,26 +12,54 @@ test("overlay migrates legacy tests and serializes rollback-safe history writes"
     'id: historyAdapter', 'property int schemaVersion: 1', 'property var entries: []', 'property var tests: []',
     'tests: historyAdapter.tests', 'function historyAdapterSnapshot()',
     'property var historyWriteSnapshot: null', 'property var historyQueuedWrite: null',
-    'property var historyPendingEffects: []',
-    'function persistHistory(document, operation, resultTimestamp, targetId)',
+    'property var historyPendingEffects: []', 'property var historyConflictEffects: []',
+    'function persistHistory(document, operation, resultTimestamp, targetId, resultEntry)',
+    'function applyHistoryEffects(document, effects)', 'entry: kind === "result" ? History.cleanEntry(resultEntry, History.SCHEMA_VERSION) : null',
     'request.effects = root.historyQueuedWrite.effects.concat(request.effects)',
     'root.historyQueuedWrite = request', 'function drainQueuedHistoryWrite()',
     'if (!saved && snapshot) root.applyHistoryAdapter(snapshot, false)',
     'root.historyWritePending = false',
-    'root.historyQueuedWrite.effects = effects.concat(root.historyQueuedWrite.effects || [])',
+    'var recoveryEffects = (conflict || queuedEffects.length) ? effects.concat(queuedEffects) : []',
+    'root.historyConflictEffects = recoveryEffects',
     'root.historyReloadAfterFailure = true',
     'root.finishHistoryRead(text, exists, "")',
     'onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }',
-    'onSaved: root.completeHistoryWrite(true, "")',
-    'onSaveFailed: function(error) { root.completeHistoryWrite(false, error) }',
+    'onSaved: root.completeHistoryWrite(true, "", false)',
+    'onSaveFailed: function(error) { root.completeHistoryWrite(false, error, false) }',
+    'onSaveConflict: function(error) { root.completeHistoryWrite(false, error, true) }',
     'historyAdapter.tests = clearLegacyTests ? [] : (document.tests || [])',
     'historyStore.save(serialized)'
   ]);
   const complete = qml.slice(qml.indexOf("function completeHistoryWrite"), qml.indexOf("function finishHistoryFailureReload"));
-  assert.ok(complete.indexOf("root.applyHistoryAdapter(snapshot, false)") < complete.indexOf("root.historyReloadAfterFailure = true"));
-  assert.ok(complete.indexOf("root.historyReloadAfterFailure = true") < complete.indexOf("root.historyWritePending = false"));
-  assert.ok(complete.indexOf("root.historyWritePending = false") < complete.indexOf("historyStore.reload()"));
+  assert.ok(complete.indexOf("root.applyHistoryAdapter(snapshot, false)") < complete.indexOf("root.historyWritePending = false"));
+  assert.ok(complete.indexOf("root.historyWritePending = false") < complete.indexOf("root.historyReloadAfterFailure = true"));
+  assert.ok(complete.indexOf("root.historyReloadAfterFailure = true") < complete.indexOf("historyStore.reload()"));
   assert.doesNotMatch(qml, /wait for the current history save to finish/);
+});
+
+test("history reload journals new operations and clears effects only after a successful rebase", () => {
+  const qml = read("OmaType.qml");
+  includesAll(qml, [
+    'function markCurrentHistoryResultFailed(effects)',
+    'effect.kind === "result" && root.result && root.result.timestamp === effect.resultTimestamp',
+    'function queueHistoryReloadEffects(request)',
+    'var combined = root.historyConflictEffects.concat(request.effects || [])',
+    'if (combined.length > History.MAX_EFFECTS)',
+    'if (root.historyReloadAfterFailure) return root.queueHistoryReloadEffects(request)',
+    'var effects = root.historyConflictEffects.slice()',
+    'history reload failed · local changes remain pending',
+    'history rebase failed · local changes remain pending',
+    'root.historyConflictEffects = []',
+    'root.historyReloadAfterFailure = false',
+    'root.persistHistory(null, "result", summary.timestamp, "", summary)'
+  ]);
+  const persist = qml.slice(qml.indexOf("function persistHistory"), qml.indexOf("function drainQueuedHistoryWrite"));
+  assert.ok(persist.indexOf("historyReloadAfterFailure") < persist.indexOf("!document || document.schemaVersion"));
+  const rebase = qml.slice(qml.indexOf("function finishHistoryFailureReload"), qml.indexOf("function finishHistoryRead"));
+  assert.ok(rebase.indexOf("applyHistoryEffects") < rebase.indexOf("root.historyConflictEffects = []"));
+  assert.ok(rebase.indexOf("root.historyConflictEffects = []") < rebase.indexOf("root.startHistoryWrite"));
+  assert.doesNotMatch(rebase, /if \(root\.result\) \{\s*root\.resultSaved = false/);
+  assert.ok((qml.match(/length > History\.MAX_EFFECTS/g) || []).length >= 4);
 });
 
 test("saved-state messaging follows successful clear and current-result deletion", () => {

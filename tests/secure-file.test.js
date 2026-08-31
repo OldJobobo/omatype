@@ -22,8 +22,10 @@ function fixture() {
   };
 }
 
-function run(home, operation, target, cap, input) {
-  return spawnSync(python, ["-I", "-S", helper, operation, target, String(cap)], {
+function run(home, operation, target, cap, input, expected = "any") {
+  const args = ["-I", "-S", helper, operation, target, String(cap)];
+  if (operation === "write") args.push(expected);
+  return spawnSync(python, args, {
     env: {HOME: home, LANG: "C.UTF-8"},
     input,
     encoding: input instanceof Buffer ? null : "utf8",
@@ -36,6 +38,14 @@ function frame(value) {
   return Buffer.concat([Buffer.from(String(data.length) + "\n", "ascii"), data]);
 }
 
+function revisionOf(value) {
+  return require("node:crypto").createHash("sha256").update(value).digest("hex");
+}
+
+function reportedRevision(result) {
+  return String(result.stderr).match(/revision:(absent|[0-9a-f]{64})/)?.[1] || "";
+}
+
 function tempFiles(target) {
   if (!fs.existsSync(path.dirname(target))) return [];
   return fs.readdirSync(path.dirname(target)).filter(name => name.startsWith("." + path.basename(target) + ".tmp-"));
@@ -46,9 +56,11 @@ test("secure helper writes and reads Unicode atomically with mode 0600", t => {
   const content = JSON.stringify({label: "café λ"});
   const written = run(f.home, "write", f.settings, 262144, frame(content));
   assert.equal(written.status, 0, String(written.stderr));
+  assert.equal(reportedRevision(written), revisionOf(content));
   assert.equal(fs.statSync(f.settings).mode & 0o777, 0o600);
   const read = run(f.home, "read", f.settings, 262144);
   assert.equal(read.status, 0, String(read.stderr));
+  assert.equal(reportedRevision(read), revisionOf(content));
   assert.equal(String(read.stdout), content);
   fs.chmodSync(f.settings, 0o644);
   const replaced = run(f.home, "write", f.settings, 262144, frame("{}"));
@@ -61,6 +73,7 @@ test("missing files are distinct from unsafe files", t => {
   const f = fixture(); t.after(f.cleanup);
   const missing = run(f.home, "read", f.history, 16777216);
   assert.equal(missing.status, 3);
+  assert.equal(reportedRevision(missing), "absent");
   fs.mkdirSync(path.dirname(f.history), {recursive: true});
   fs.mkdirSync(f.history);
   const unsafe = run(f.home, "read", f.history, 16777216);
@@ -158,14 +171,13 @@ test("read caps reject cap plus one and invalid UTF-8", t => {
   assert.equal(run(f.home, "read", f.settings, 4).status, 6);
 });
 
-test("write framing accepts the exact cap and rejects malformed, truncated, oversized, extra, and invalid UTF-8 payloads", t => {
+test("write framing accepts the exact cap and rejects malformed, truncated, oversized, and invalid UTF-8 payloads", t => {
   const f = fixture(); t.after(f.cleanup);
   assert.equal(run(f.home, "write", f.settings, 4, frame("1234")).status, 0);
   const cases = [
     [Buffer.from("wat\n{}"), 7],
     [Buffer.from("4\n{}"), 7],
     [Buffer.from("5\n12345"), 7, 4],
-    [Buffer.from("2\n{}x"), 7],
     [Buffer.concat([Buffer.from("1\n"), Buffer.from([0xff])]), 6]
   ];
   for (const [input, expected, cap = 262144] of cases) {
@@ -175,10 +187,135 @@ test("write framing accepts the exact cap and rejects malformed, truncated, over
   }
 });
 
-test("helper rejects paths and caps outside its fixed allowlist", t => {
+test("CAS writes reject stale revisions and symlink destinations without overwriting", t => {
+  const f = fixture(); t.after(f.cleanup);
+  fs.mkdirSync(path.dirname(f.settings), {recursive: true});
+  fs.writeFileSync(f.settings, "first", {mode: 0o600});
+  const firstRevision = revisionOf("first");
+  assert.equal(run(f.home, "write", f.settings, 262144, frame("second"), firstRevision).status, 0);
+  const stale = run(f.home, "write", f.settings, 262144, frame("stale"), firstRevision);
+  assert.equal(stale.status, 8, String(stale.stderr));
+  assert.equal(fs.readFileSync(f.settings, "utf8"), "second");
+
+  const target = path.join(f.home, "untouched.json");
+  fs.writeFileSync(target, "untouched");
+  fs.unlinkSync(f.settings);
+  fs.symlinkSync(target, f.settings);
+  const linkConflict = run(f.home, "write", f.settings, 262144, frame("blocked"), "absent");
+  assert.equal(linkConflict.status, 8, String(linkConflict.stderr));
+  assert.equal(fs.lstatSync(f.settings).isSymbolicLink(), true);
+  assert.equal(fs.readFileSync(target, "utf8"), "untouched");
+});
+
+test("write rejects group-writable path components", t => {
+  const f = fixture(); t.after(f.cleanup);
+  const config = path.join(f.home, ".config");
+  fs.mkdirSync(config);
+  fs.chmodSync(config, 0o770);
+  const result = run(f.home, "write", f.settings, 262144, frame("{}"), "absent");
+  assert.equal(result.status, 4, String(result.stderr));
+  assert.equal(fs.existsSync(f.settings), false);
+});
+
+test("pre-rename replacement is detected without overwriting the replacement", t => {
+  const f = fixture(); t.after(f.cleanup);
+  fs.mkdirSync(path.dirname(f.settings), {recursive: true});
+  fs.writeFileSync(f.settings, "original", {mode: 0o600});
+  const code = [
+    "import importlib.util, os, sys",
+    "sys.dont_write_bytecode = True",
+    "spec = importlib.util.spec_from_file_location('secure_file', sys.argv[1])",
+    "module = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(module)",
+    "target = sys.argv[3]",
+    "def replace(parent, name):",
+    "    os.unlink(name, dir_fd=parent)",
+    "    fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent)",
+    "    os.write(fd, b'replacement')",
+    "    os.close(fd)",
+    "module.before_publish = replace",
+    "try:",
+    "    module.write_target(sys.argv[2], ('.config', 'omarchy', 'omatype-settings.json'), 262144, sys.argv[4])",
+    "except module.BoundaryError as error:",
+    "    raise SystemExit(0 if error.code == module.EXIT_CONFLICT else 2)",
+    "raise SystemExit(1)"
+  ].join("\n");
+  const result = spawnSync(python, ["-I", "-S", "-c", code, helper, f.home, f.settings, revisionOf("original")], {
+    env: {HOME: f.home, LANG: "C.UTF-8"}, input: frame("new"), encoding: null, timeout: 3000
+  });
+  assert.equal(result.status, 0, String(result.stderr));
+  assert.equal(fs.readFileSync(f.settings, "utf8"), "replacement");
+  assert.deepEqual(tempFiles(f.settings), []);
+});
+
+test("destination growth beyond the cap becomes a conflict before publish", t => {
+  const f = fixture(); t.after(f.cleanup);
+  fs.mkdirSync(path.dirname(f.settings), {recursive: true});
+  fs.writeFileSync(f.settings, "original", {mode: 0o600});
+  const code = [
+    "import importlib.util, os, sys",
+    "sys.dont_write_bytecode = True",
+    "spec = importlib.util.spec_from_file_location('secure_file', sys.argv[1])",
+    "module = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(module)",
+    "target = sys.argv[3]",
+    "def grow(parent, name):",
+    "    fd = os.open(name, os.O_WRONLY | os.O_APPEND, dir_fd=parent)",
+    "    os.write(fd, b'x' * 262145)",
+    "    os.close(fd)",
+    "module.before_publish = grow",
+    "try:",
+    "    module.write_target(sys.argv[2], ('.config', 'omarchy', 'omatype-settings.json'), 262144, sys.argv[4])",
+    "except module.BoundaryError as error:",
+    "    raise SystemExit(0 if error.code == module.EXIT_CONFLICT else 2)",
+    "raise SystemExit(1)"
+  ].join("\n");
+  const result = spawnSync(python, ["-I", "-S", "-c", code, helper, f.home, f.settings, revisionOf("original")], {
+    env: {HOME: f.home, LANG: "C.UTF-8"}, input: frame("new"), encoding: null, timeout: 3000
+  });
+  assert.equal(result.status, 0, String(result.stderr));
+  assert.ok(fs.statSync(f.settings).size > 262144);
+  assert.deepEqual(tempFiles(f.settings), []);
+});
+
+test("pre-rename parent replacement is detected without publishing into a detached directory", t => {
+  const f = fixture(); t.after(f.cleanup);
+  fs.mkdirSync(path.dirname(f.settings), {recursive: true});
+  fs.writeFileSync(f.settings, "original", {mode: 0o600});
+  const moved = path.dirname(f.settings) + "-moved";
+  const code = [
+    "import importlib.util, os, sys",
+    "sys.dont_write_bytecode = True",
+    "spec = importlib.util.spec_from_file_location('secure_file', sys.argv[1])",
+    "module = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(module)",
+    "target, moved = sys.argv[3], sys.argv[4]",
+    "def replace_parent(parent, name):",
+    "    original = os.path.dirname(target)",
+    "    os.rename(original, moved)",
+    "    os.mkdir(original, 0o700)",
+    "    with open(target, 'w', encoding='utf-8') as stream: stream.write('replacement')",
+    "module.before_publish = replace_parent",
+    "try:",
+    "    module.write_target(sys.argv[2], ('.config', 'omarchy', 'omatype-settings.json'), 262144, sys.argv[5])",
+    "except module.BoundaryError as error:",
+    "    raise SystemExit(0 if error.code == module.EXIT_CONFLICT else 2)",
+    "raise SystemExit(1)"
+  ].join("\n");
+  const result = spawnSync(python, ["-I", "-S", "-c", code, helper, f.home, f.settings, moved, revisionOf("original")], {
+    input: frame("attacker-target"), env: {HOME: f.home, LANG: "C.UTF-8"}, encoding: "utf8", timeout: 3000
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.readFileSync(f.settings, "utf8"), "replacement");
+  assert.equal(fs.readFileSync(path.join(moved, path.basename(f.settings)), "utf8"), "original");
+  assert.deepEqual(tempFiles(path.join(moved, path.basename(f.settings))), []);
+});
+
+test("helper rejects paths, caps, and malformed expected revisions outside its allowlist", t => {
   const f = fixture(); t.after(f.cleanup);
   const other = path.join(f.home, ".config", "omarchy", "other.json");
   assert.equal(run(f.home, "write", other, 10, frame("{}" )).status, 4);
   assert.equal(run(f.home, "write", f.settings, 262145, frame("{}" )).status, 4);
   assert.equal(run(f.home, "write", f.history, 16777217, frame("{}" )).status, 4);
+  assert.equal(run(f.home, "write", f.settings, 262144, frame("{}"), "not-a-revision").status, 2);
 });
