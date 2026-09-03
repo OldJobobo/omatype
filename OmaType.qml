@@ -1685,7 +1685,7 @@ Item {
                                                     return root.textColor
                                                 }
                                                 var highlight = root.runtimeSettings.appearance.highlight
-                                                if (highlight === "letter" && globalIndex === root.typing.cursor) return root.accentColor
+                                                if (highlight === "letter" && root.typing && globalIndex === root.typing.cursor) return root.accentColor
                                                 if (highlight === "word" && wordDelegate.index === root.activeWordIndex) return root.textColor
                                                 if (highlight === "next-word" && wordDelegate.index === root.activeWordIndex + 1) return root.textColor
                                                 return root.mutedColor
