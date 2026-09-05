@@ -26,6 +26,7 @@ Timed and word tests in a focused interface that follows your active theme—wit
 - Track comparable pace, personal bests, recent accuracy, streaks, daily activity, goals, and same-setup language progress over time.
 - Inspect or delete retained results, clear history with confirmation, and export retained runs to CSV.
 - Tune the caret, timer, live metrics, typography, line geometry, focus behavior, motion, contrast, and error indicators.
+- Keep a keyboard guide below the prompt, highlight the next key, and switch between six built-in layouts or a custom positioned or rows-based layout file.
 
 Each natural language uses a 500-word offline corpus. OmaType preserves its original English vocabulary and expands every pack with reviewed common-word data, native spelling, and diacritics. Programming packs contain original, project-curated keywords, operators, syntax terms, and common API identifiers. Vocabulary attribution is documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
@@ -61,6 +62,10 @@ For a pointer-free launch, assign that command to an available shortcut through 
 | Change the test length | `Ctrl+Up` / `Ctrl+Down` |
 | Toggle punctuation | `Ctrl+P` |
 | Toggle numbers | `Ctrl+N` |
+| Show or hide the keyboard guide | `Ctrl+K` |
+| Add or remove a keyboard layout | `Ctrl+Shift+A` / `Ctrl+Shift+D` |
+| Previous or next keyboard layout | `Ctrl+Shift+Up` / `Ctrl+Shift+Down` |
+| Previous or next keyboard layer | `Ctrl+Shift+Left` / `Ctrl+Shift+Right` |
 | Choose a language | `Ctrl+L` |
 | Open progress | `Ctrl+H` |
 | Open settings | `Ctrl+,` |
@@ -83,6 +88,27 @@ Progress comparisons default to the current exact mode, amount, language, punctu
 
 Programming vocabularies preserve syntax tokens as written, so punctuation and number transformations are unavailable while a programming language is selected. Natural-language packs support both transformations.
 
+## Keyboard layouts and layers
+
+- **Default:** full-size US QWERTY, with the guide hidden until you press `Ctrl+K`.
+- **Presets:** US QWERTY, German QWERTZ, AZERTY, Dvorak, Colemak, and Workman.
+- **Add:** click the rightmost `+` above the keyboard, or press `Ctrl+Shift+A`, choose with `Left` / `Right`, and press `Enter`.
+- **Select:** left-click a layout name or press `Ctrl+Shift+Up` / `Ctrl+Shift+Down`.
+- **Remove:** right-click a layout name or press `Ctrl+Shift+D`; the final layout is protected.
+- **Persistence:** added layouts and the active layout are saved locally.
+- **Next key:** shown with the normal accent color; a label shared by the main block and the numeric cluster lights only the main-block key.
+- **Modifiers:** Shift and AltGr are also highlighted when a character requires them.
+- **German levels:** German QWERTZ shows base, Shift, AltGr, and Shift+AltGr characters from the installed XKB layout.
+- **Layers:** click a layer name or press `Ctrl+Shift+Left` / `Ctrl+Shift+Right`.
+- **Custom layout:** add `~/.config/omarchy/omatype-keyboard.json`; a valid file appears in the `+` menu.
+
+To add your own keyboard, copy an example to `~/.config/omarchy/omatype-keyboard.json`:
+
+- [`examples/omatype-keyboard.json`](examples/omatype-keyboard.json) is the full **Engrammer Remnant** split layout (seven positioned layers with thumb keys), shipped as a file instead of a built-in preset.
+- [`examples/omatype-keyboard-simple.json`](examples/omatype-keyboard-simple.json) is a small rows-based starter.
+
+OmaType watches that file and adds its declared name to the layout selector after validation. The version-1 format accepts one to twelve layers. A layer uses either `rows` of key labels or positioned `keys` with `x`, `y`, `width`, and `height` plus a `bounds` box; positioned layers may also list index-based `layerThumbKeys`. A key can be a plain string or an object with `label`, optional `shift`, `altGr`, `shiftAltGr`, and `width` fields. Labels and collection sizes are bounded; file paths, QML, JavaScript, commands, and image sources are not accepted. The file is read as data and never executed.
+
 ## Local by design
 
 OmaType does not use the network, read credentials, request elevated privileges, invoke a package manager, or modify unrelated user configuration.
@@ -90,6 +116,7 @@ OmaType does not use the network, read credentials, request elevated privileges,
 | Data | Location |
 | --- | --- |
 | Preferences and daily goal | `~/.config/omarchy/omatype-settings.json` |
+| Optional custom keyboard layout | `~/.config/omarchy/omatype-keyboard.json` |
 | Typing history and compacted long-term statistics | `~/.local/state/omarchy/omatype-history.json` |
 | Optional retained-result CSV export | `~/.local/state/omarchy/omatype-history.csv` |
 

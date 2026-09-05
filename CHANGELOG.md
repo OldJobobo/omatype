@@ -30,6 +30,7 @@ All notable changes to OmaType are documented here.
 
 ### Added
 
+- A keyboard guide with six built-in presets, next-character highlighting, keyboard-accessible layout and layer navigation, and a bounded declarative custom layout file that also ships the Engrammer Remnant layout as an optional example.
 - A persistent, keyboard-first progress view with strict current-setup comparisons, paired net/raw pace charts, retained-result detail, historical interval curves, 90-day activity, streaks, totals, daily goals, and same-setup language comparisons.
 - Confirmed selective deletion, confirmed history clearing, and local CSV export for retained runs.
 - German, Spanish, French, Italian, Portuguese, and Dutch practice packs alongside English, with 500-word natural-language corpora and bundled attribution.
