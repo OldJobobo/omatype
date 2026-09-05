@@ -54,6 +54,7 @@ test("all persistence paths use secure caps and explicit normalization", () => {
     'id: csvStore', 'compareAndSwap: false',
     'id: legacySettingsStore', 'maxBytes: 262144',
     'id: settingsStore',
+    'id: keyboardLayoutStore', 'omatype-keyboard.json', 'KeyboardLayouts.parse(text)',
     'History.normalize(JSON.parse(text))',
     'Settings.readDocument(parsed)',
     'settingsStore.save(JSON.stringify(normalized))',

@@ -6,6 +6,7 @@ All notable changes to OmaType are documented here.
 
 ### Added
 
+- A keyboard guide with QWERTY and Engrammer presets, next-character highlighting, keyboard-accessible layer navigation, and a bounded declarative custom layout file.
 - A persistent, keyboard-first progress view with strict current-setup comparisons, paired net/raw pace charts, retained-result detail, historical interval curves, 90-day activity, streaks, totals, daily goals, and same-setup language comparisons.
 - Confirmed selective deletion, confirmed history clearing, and local CSV export for retained runs.
 

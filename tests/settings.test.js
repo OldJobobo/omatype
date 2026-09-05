@@ -40,7 +40,10 @@ test("settings expose versioned category defaults", () => {
     wordSpacing: 21,
     focusHideHeader: true,
     focusHideSetup: true,
-    focusHideFooter: true
+    focusHideFooter: true,
+    keyboardGuide: true,
+    keyboardLayout: "qwerty",
+    keyboardLayouts: ["qwerty"]
   });
   assert.deepEqual(value.accessibility, {
     reducedMotion: false,
@@ -101,7 +104,8 @@ test("behavior, appearance, and accessibility settings are allowlisted and bound
     appearance: {
       timerStyle: "bar", liveWpm: true, liveAccuracy: true, highlight: "word", typedEffect: "fade",
       smoothScroll: false, lineCount: 99, fontSize: 200, maxLineWidth: -5, lineHeight: 2,
-      wordSpacing: 500, focusHideHeader: false, focusHideSetup: false, focusHideFooter: false
+      wordSpacing: 500, focusHideHeader: false, focusHideSetup: false, focusHideFooter: false,
+      keyboardGuide: false, keyboardLayout: "qwerty", keyboardLayouts: ["qwerty", "colemak"]
     },
     accessibility: {reducedMotion: true, highContrast: true, errorStyle: "both"}
   });
@@ -112,11 +116,14 @@ test("behavior, appearance, and accessibility settings are allowlisted and bound
   assert.equal(normalized.appearance.maxLineWidth, 480);
   assert.equal(normalized.appearance.lineHeight, 34);
   assert.equal(normalized.appearance.wordSpacing, 60);
+  assert.equal(normalized.appearance.keyboardGuide, false);
+  assert.equal(normalized.appearance.keyboardLayout, "qwerty");
+  assert.deepEqual(normalized.appearance.keyboardLayouts, ["qwerty", "colemak"]);
   assert.deepEqual(normalized.accessibility, {reducedMotion: true, highContrast: true, errorStyle: "both"});
 
   const fallback = Settings.normalize({
     behavior: {stopOnError: "explode", backspace: "sometimes"},
-    appearance: {timerStyle: "clock", highlight: "rainbow", typedEffect: "erase"},
+    appearance: {timerStyle: "clock", highlight: "rainbow", typedEffect: "erase", keyboardLayout: "../../evil"},
     accessibility: {errorStyle: "sparkle"}
   });
   assert.equal(fallback.behavior.stopOnError, "off");
@@ -124,6 +131,7 @@ test("behavior, appearance, and accessibility settings are allowlisted and bound
   assert.equal(fallback.appearance.timerStyle, "text");
   assert.equal(fallback.appearance.highlight, "letter");
   assert.equal(fallback.appearance.typedEffect, "keep");
+  assert.equal(fallback.appearance.keyboardLayout, "qwerty");
   assert.equal(fallback.accessibility.errorStyle, "color");
 });
 
@@ -166,4 +174,11 @@ test("updates and category resets do not mutate the prior value", () => {
   assert.equal(updated.caret.style, "underline");
   assert.equal(Settings.resetCategory(updated, "caret").caret.style, "default");
   assert.deepEqual(Settings.resetCategory(updated, "unknown"), updated);
+});
+
+test("layout collections allow QWERTY removal but retain one valid layout", () => {
+  const withoutQwerty = Settings.normalize({appearance: {keyboardLayout: "engrammer", keyboardLayouts: ["engrammer"]}});
+  assert.deepEqual(withoutQwerty.appearance.keyboardLayouts, ["engrammer"]);
+  assert.equal(withoutQwerty.appearance.keyboardLayout, "engrammer");
+  assert.deepEqual(Settings.normalize({appearance: {keyboardLayouts: []}}).appearance.keyboardLayouts, ["qwerty"]);
 });

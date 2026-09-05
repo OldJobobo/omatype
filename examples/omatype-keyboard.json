@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "name": "Example split keyboard",
+  "description": "Copy this file to ~/.config/omarchy/omatype-keyboard.json and customize it.",
+  "layers": [
+    {
+      "id": "base",
+      "name": "Base",
+      "rows": [
+        ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+        ["A", "S", "D", "F", "G", "H", "J", "K", "L", {"label": ";", "shift": ":"}],
+        ["Z", "X", "C", "V", "B", "N", "M", {"label": ",", "shift": "<"}, {"label": ".", "shift": ">"}, {"label": "/", "shift": "?"}],
+        [{"label": "Space", "width": 5}]
+      ]
+    },
+    {
+      "id": "navigation",
+      "name": "Navigation",
+      "rows": [
+        ["·", "·", "·", "·", "·", "Home", "PgDn", "PgUp", "End", "·"],
+        ["·", "·", "·", "·", "·", "Left", "Down", "Up", "Right", "·"]
+      ]
+    }
+  ]
+}
