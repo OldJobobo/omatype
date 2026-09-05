@@ -13,9 +13,11 @@ import "src/ipc-policy.js" as IpcPolicy
 import "src/layout.js" as Layout
 import "src/languages.js" as Languages
 import "src/words.js" as WordList
+import "src/keyboard-layouts.js" as KeyboardLayouts
 import "components" as Components
 import "components/settings" as SettingsUi
 import "components/progress" as ProgressUi
+import "components/keyboard" as KeyboardUi
 
 Item {
     id: root
@@ -77,12 +79,26 @@ Item {
     readonly property string activeMode: root.activeSettings.test.mode
     readonly property int activeAmount: root.activeSettings.test.mode === "time" ? root.activeSettings.test.time : root.activeSettings.test.words
     property var wordLayout: []
+    property var customKeyboardLayout: null
+    property string customKeyboardStatus: "loading"
+    property int keyboardLayerIndex: 0
+    property bool keyboardLayoutPickerOpen: false
 
     readonly property var timeOptions: [15, 30, 60, 120]
     readonly property var wordOptions: [10, 25, 50, 100]
     readonly property var settingsSections: ["test", "behavior", "display", "caret", "access"]
     readonly property var settingsCategories: ["test", "behavior", "appearance", "caret", "accessibility", "progress"]
     readonly property var languageOptions: Languages.options()
+    readonly property var allKeyboardLayoutOptions: KeyboardLayouts.options(root.customKeyboardLayout).map(function(option) { return option.id })
+    readonly property var addedKeyboardLayouts: KeyboardLayouts.options(root.customKeyboardLayout).filter(function(option) {
+        return root.userSettings.appearance.keyboardLayouts.indexOf(option.id) >= 0
+    })
+    readonly property var availableKeyboardLayouts: KeyboardLayouts.options(root.customKeyboardLayout).filter(function(option) {
+        return root.userSettings.appearance.keyboardLayouts.indexOf(option.id) < 0
+    })
+    readonly property var keyboardLayoutOptions: root.addedKeyboardLayouts.map(function(option) { return option.id })
+    readonly property var selectedKeyboardLayout: KeyboardLayouts.get(root.userSettings.appearance.keyboardLayout, root.customKeyboardLayout)
+    readonly property string nextCharacter: root.typing && root.typing.cursor < root.typing.target.length ? root.typing.target.charAt(root.typing.cursor) : ""
     readonly property var currentLanguagePack: Languages.get(root.language)
     readonly property var activeLanguagePack: Languages.get(root.activeLanguage)
     readonly property bool programmingLanguage: activeLanguagePack.category === "programming"
@@ -124,6 +140,8 @@ Item {
         var item = wordRepeater.itemAt(activeWordIndex)
         if (item) activeWordY = item.y
     })
+
+    onSelectedKeyboardLayoutChanged: root.keyboardLayerIndex = 0
 
     function isPrintable(text) {
         if (typeof text !== "string" || Array.from(text).length !== 1) return false
@@ -509,6 +527,54 @@ Item {
         if (index < 0) index = 0
         var next = (index + delta + options.length) % options.length
         root.chooseAmount(options[next])
+    }
+
+    function chooseKeyboardLayout(layoutId) {
+        if (root.keyboardLayoutOptions.indexOf(layoutId) < 0) return false
+        root.keyboardLayerIndex = 0
+        return root.applySetting("appearance", "keyboardLayout", layoutId)
+    }
+
+    function addKeyboardLayout(layoutId) {
+        if (root.allKeyboardLayoutOptions.indexOf(layoutId) < 0) return false
+        var layouts = root.userSettings.appearance.keyboardLayouts.slice()
+        if (layouts.indexOf(layoutId) < 0) layouts.push(layoutId)
+        var next = Settings.update(root.userSettings, "appearance", "keyboardLayouts", layouts)
+        next = Settings.update(next, "appearance", "keyboardLayout", layoutId)
+        root.userSettings = next
+        root.keyboardLayerIndex = 0
+        root.keyboardLayoutPickerOpen = false
+        root.persistSettings()
+        return true
+    }
+
+    function removeKeyboardLayout(layoutId) {
+        var layouts = root.userSettings.appearance.keyboardLayouts.slice()
+        if (layouts.length <= 1) return false
+        var index = layouts.indexOf(layoutId)
+        if (index < 0) return false
+        layouts.splice(index, 1)
+        var next = Settings.update(root.userSettings, "appearance", "keyboardLayouts", layouts)
+        if (next.appearance.keyboardLayout === layoutId)
+            next = Settings.update(next, "appearance", "keyboardLayout", layouts[0])
+        root.userSettings = next
+        root.keyboardLayerIndex = 0
+        root.persistSettings()
+        return true
+    }
+
+    function cycleKeyboardLayer(delta) {
+        var layers = root.selectedKeyboardLayout && root.selectedKeyboardLayout.layers ? root.selectedKeyboardLayout.layers : []
+        if (layers.length === 0) return
+        root.keyboardLayerIndex = (root.keyboardLayerIndex + delta + layers.length) % layers.length
+    }
+
+    function cycleKeyboardLayout(delta) {
+        var options = root.keyboardLayoutOptions
+        if (options.length === 0) return
+        var current = options.indexOf(root.runtimeSettings.appearance.keyboardLayout)
+        if (current < 0) current = 0
+        root.chooseKeyboardLayout(options[(current + delta + options.length) % options.length])
     }
 
     function globalStartForWord(wordIndex) {
@@ -1018,6 +1084,28 @@ Item {
     }
 
     Components.SecureFile {
+        id: keyboardLayoutStore
+        path: Quickshell.env("HOME") + "/.config/omarchy/omatype-keyboard.json"
+        maxBytes: 262144
+        watchChanges: true
+        onLoaded: function(text, exists) {
+            if (!exists) {
+                root.customKeyboardLayout = null
+                root.customKeyboardStatus = "not installed"
+                return
+            }
+            var parsed = KeyboardLayouts.parse(text)
+            root.customKeyboardLayout = parsed.value
+            root.customKeyboardStatus = parsed.status === "ready" ? "ready" : "invalid custom layout"
+        }
+        onLoadFailed: function(error) {
+            root.customKeyboardLayout = null
+            root.customKeyboardStatus = "custom layout unavailable"
+            console.warn("OmaType keyboard layout read failed: " + error)
+        }
+    }
+
+    Components.SecureFile {
         id: settingsStore
         path: Quickshell.env("HOME") + "/.config/omarchy/omatype-settings.json"
         maxBytes: 262144
@@ -1115,6 +1203,11 @@ Item {
                     event.accepted = true
                     return
                 }
+                if (event.key === Qt.Key_K && controlHeld) {
+                    root.applySetting("appearance", "keyboardGuide", !root.userSettings.appearance.keyboardGuide)
+                    event.accepted = true
+                    return
+                }
                 if (root.languagePanelOpen) {
                     var nextLanguage = languageGrid.currentIndex < 0 ? 0 : languageGrid.currentIndex
                     if (event.key === Qt.Key_Escape) root.closeLanguagePanel()
@@ -1152,6 +1245,16 @@ Item {
                     else if (event.key === Qt.Key_PageDown) settingsPanel.scrollBy(220)
                     else if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return || event.key === Qt.Key_Space) settingsPanel.activateFocusedRow(1)
                     else if (event.key === Qt.Key_R) settingsPanel.resetCurrentSection()
+                    event.accepted = true
+                    return
+                }
+                if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Left) {
+                    root.cycleKeyboardLayer(-1)
+                    event.accepted = true
+                    return
+                }
+                if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Right) {
+                    root.cycleKeyboardLayer(1)
                     event.accepted = true
                     return
                 }
@@ -1522,6 +1625,7 @@ Item {
                     textColor: root.textColor
                     mutedColor: root.mutedColor
                     fontFamily: root.typeface
+                    keyboardLayoutOptions: root.keyboardLayoutOptions
                     onSettingChanged: function(category, key, value) {
                         root.applySetting(category, key, value)
                     }
@@ -1685,7 +1789,7 @@ Item {
                                                     return root.textColor
                                                 }
                                                 var highlight = root.runtimeSettings.appearance.highlight
-                                                if (highlight === "letter" && globalIndex === root.typing.cursor) return root.accentColor
+                                                if (highlight === "letter" && root.typing && globalIndex === root.typing.cursor) return root.accentColor
                                                 if (highlight === "word" && wordDelegate.index === root.activeWordIndex) return root.textColor
                                                 if (highlight === "next-word" && wordDelegate.index === root.activeWordIndex + 1) return root.textColor
                                                 return root.mutedColor
@@ -1752,6 +1856,135 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.restart()
                         }
+                    }
+                }
+
+                Item {
+                    id: keyboardGuidePanel
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: testView.y + testView.height + 86
+                    width: Math.min(parent.width, 1377)
+                    height: Math.max(171, Math.min(329, surface.height - y - 72))
+                    visible: root.userSettings.appearance.keyboardGuide && !root.result && !root.settingsOpen && !root.languagePanelOpen && !root.progressOpen
+
+                    Row {
+                        id: keyboardLayoutSelector
+                        anchors.top: parent.top
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        height: 24
+                        spacing: 16
+                        Repeater {
+                            model: root.addedKeyboardLayouts
+                            delegate: Text {
+                                id: addedLayoutOption
+                                required property var modelData
+                                text: modelData.name
+                                height: keyboardLayoutSelector.height
+                                verticalAlignment: Text.AlignVCenter
+                                color: root.userSettings.appearance.keyboardLayout === modelData.id ? root.accentColor : root.mutedColor
+                                font.family: root.typeface
+                                font.pixelSize: 12
+                                font.weight: root.userSettings.appearance.keyboardLayout === modelData.id ? Font.DemiBold : Font.Normal
+                                Accessible.role: Accessible.Button
+                                Accessible.name: "Use " + modelData.name + " keyboard layout"
+                                Accessible.selected: root.userSettings.appearance.keyboardLayout === modelData.id
+                                Accessible.onPressAction: root.chooseKeyboardLayout(modelData.id)
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -6
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: function(mouse) {
+                                        if (mouse.button === Qt.RightButton) root.removeKeyboardLayout(addedLayoutOption.modelData.id)
+                                        else root.chooseKeyboardLayout(addedLayoutOption.modelData.id)
+                                    }
+                                }
+                            }
+                        }
+                        Text {
+                            id: addKeyboardLayoutButton
+                            text: "+"
+                            height: keyboardLayoutSelector.height
+                            verticalAlignment: Text.AlignVCenter
+                            color: root.keyboardLayoutPickerOpen ? root.accentColor : root.mutedColor
+                            font.family: root.typeface
+                            font.pixelSize: 12
+                            font.weight: Font.Normal
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Add keyboard layout"
+                            Accessible.onPressAction: root.keyboardLayoutPickerOpen = !root.keyboardLayoutPickerOpen
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -7
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.keyboardLayoutPickerOpen = !root.keyboardLayoutPickerOpen
+                            }
+                        }
+                        Text {
+                            visible: root.userSettings.appearance.keyboardLayout === "custom" && !root.customKeyboardLayout
+                            text: root.customKeyboardStatus
+                            color: root.errorColor
+                            font.family: root.typeface
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    Rectangle {
+                        id: keyboardLayoutPicker
+                        anchors.bottom: keyboardLayoutSelector.top
+                        anchors.bottomMargin: 6
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: pickerRow.implicitWidth + 24
+                        height: 38
+                        radius: 8
+                        color: root.controlColor
+                        border.width: 1
+                        border.color: Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.35)
+                        visible: root.keyboardLayoutPickerOpen && root.availableKeyboardLayouts.length > 0
+                        z: 5
+                        Row {
+                            id: pickerRow
+                            anchors.centerIn: parent
+                            spacing: 16
+                            Repeater {
+                                model: root.availableKeyboardLayouts
+                                delegate: Text {
+                                    id: pickerOption
+                                    required property var modelData
+                                    text: modelData.name
+                                    color: root.textColor
+                                    font.family: root.typeface
+                                    font.pixelSize: 12
+                                    Accessible.role: Accessible.Button
+                                    Accessible.name: "Add " + modelData.name + " keyboard layout"
+                                    Accessible.onPressAction: root.addKeyboardLayout(modelData.id)
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        anchors.margins: -6
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.addKeyboardLayout(pickerOption.modelData.id)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    KeyboardUi.KeyboardGuide {
+                        anchors.top: keyboardLayoutSelector.bottom
+                        anchors.topMargin: 4
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        layout: root.selectedKeyboardLayout
+                        layerIndex: root.keyboardLayerIndex
+                        nextCharacter: root.nextCharacter
+                        backgroundColor: root.backgroundColor
+                        accentColor: root.accentColor
+                        layerAccentColor: root.errorColor
+                        textColor: root.textColor
+                        mutedColor: root.mutedColor
+                        fontFamily: root.typeface
+                        onLayerSelected: function(index) { root.keyboardLayerIndex = index }
                     }
                 }
 
@@ -1851,6 +2084,7 @@ Item {
                     spacing: 25
                     visible: (!root.focusMode || !root.runtimeSettings.appearance.focusHideFooter) && !root.languagePanelOpen && !root.progressOpen
                     Text { text: "ctrl+r  restart"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text { text: "ctrl+k  keyboard"; color: root.userSettings.appearance.keyboardGuide ? root.accentColor : root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text { visible: !!root.result; text: "enter  next"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text { text: "ctrl+esc  close"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text {

@@ -11,6 +11,7 @@ const TIMER_STYLES = ["text", "mini", "bar", "off"];
 const HIGHLIGHT_MODES = ["letter", "word", "next-word", "off"];
 const TYPED_EFFECTS = ["keep", "fade", "hide"];
 const ERROR_STYLES = ["color", "underline", "both"];
+const KEYBOARD_LAYOUTS = ["qwerty", "qwertz", "azerty", "dvorak", "colemak", "workman", "engrammer", "custom"];
 const GOAL_METRICS = ["tests", "minutes", "characters"];
 const LANGUAGE_IDS = [
   "english", "ada", "assembly", "bash", "c", "clojure", "cpp", "csharp", "css",
@@ -61,7 +62,10 @@ function defaults() {
       wordSpacing: 21,
       focusHideHeader: true,
       focusHideSetup: true,
-      focusHideFooter: true
+      focusHideFooter: true,
+      keyboardGuide: true,
+      keyboardLayout: "qwerty",
+      keyboardLayouts: ["qwerty"]
     },
     accessibility: {
       reducedMotion: false,
@@ -97,6 +101,16 @@ function hex(value, fallback) {
   return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value)
     ? value.toLowerCase()
     : fallback;
+}
+
+function layoutList(value) {
+  const source = Array.isArray(value) ? value : [];
+  const result = [];
+  for (const id of source) {
+    if (KEYBOARD_LAYOUTS.indexOf(id) >= 0 && result.indexOf(id) < 0 && result.length < KEYBOARD_LAYOUTS.length)
+      result.push(id);
+  }
+  return result.length > 0 ? result : ["qwerty"];
 }
 
 function documentStatus(raw) {
@@ -158,6 +172,11 @@ function normalize(raw) {
   base.appearance.focusHideHeader = boolean(appearance.focusHideHeader, base.appearance.focusHideHeader);
   base.appearance.focusHideSetup = boolean(appearance.focusHideSetup, base.appearance.focusHideSetup);
   base.appearance.focusHideFooter = boolean(appearance.focusHideFooter, base.appearance.focusHideFooter);
+  base.appearance.keyboardGuide = boolean(appearance.keyboardGuide, base.appearance.keyboardGuide);
+  base.appearance.keyboardLayout = oneOf(appearance.keyboardLayout, KEYBOARD_LAYOUTS, base.appearance.keyboardLayout);
+  base.appearance.keyboardLayouts = layoutList(appearance.keyboardLayouts);
+  if (base.appearance.keyboardLayouts.indexOf(base.appearance.keyboardLayout) < 0)
+    base.appearance.keyboardLayout = base.appearance.keyboardLayouts[0];
 
   base.accessibility.reducedMotion = boolean(accessibility.reducedMotion, base.accessibility.reducedMotion);
   base.accessibility.highContrast = boolean(accessibility.highContrast, base.accessibility.highContrast);
@@ -175,7 +194,9 @@ function isValidUpdate(current, category, key, value) {
   if (!group || !Object.prototype.hasOwnProperty.call(group, key)) return false;
   group[key] = value;
   const normalized = normalize(next);
-  return Object.is(normalized[category][key], value);
+  return Array.isArray(value)
+    ? JSON.stringify(normalized[category][key]) === JSON.stringify(value)
+    : Object.is(normalized[category][key], value);
 }
 
 function update(current, category, key, value) {
@@ -205,6 +226,7 @@ const api = {
   HIGHLIGHT_MODES,
   TYPED_EFFECTS,
   ERROR_STYLES,
+  KEYBOARD_LAYOUTS,
   GOAL_METRICS,
   LANGUAGE_IDS,
   defaults,

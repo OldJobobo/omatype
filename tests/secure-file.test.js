@@ -15,6 +15,7 @@ function fixture() {
   return {
     home,
     settings: path.join(home, ".config", "omarchy", "omatype-settings.json"),
+    keyboard: path.join(home, ".config", "omarchy", "omatype-keyboard.json"),
     legacy: path.join(home, ".local", "state", "omarchy", "omatype-settings.json"),
     history: path.join(home, ".local", "state", "omarchy", "omatype-history.json"),
     csv: path.join(home, ".local", "state", "omarchy", "omatype-history.csv"),
@@ -318,4 +319,16 @@ test("helper rejects paths, caps, and malformed expected revisions outside its a
   assert.equal(run(f.home, "write", f.settings, 262145, frame("{}" )).status, 4);
   assert.equal(run(f.home, "write", f.history, 16777217, frame("{}" )).status, 4);
   assert.equal(run(f.home, "write", f.settings, 262144, frame("{}"), "not-a-revision").status, 2);
+});
+
+test("custom keyboard data has a dedicated bounded read-only-compatible target", t => {
+  const f = fixture(); t.after(f.cleanup);
+  const content = JSON.stringify({schemaVersion: 1, name: "Mine", layers: [{rows: [["A"]]}]});
+  fs.mkdirSync(path.dirname(f.keyboard), {recursive: true});
+  fs.writeFileSync(f.keyboard, content, {mode: 0o600});
+  const read = run(f.home, "read", f.keyboard, 262144);
+  assert.equal(read.status, 0, String(read.stderr));
+  assert.equal(String(read.stdout), content);
+  assert.equal(run(f.home, "write", f.keyboard, 262144, frame("{}")).status, 4);
+  assert.equal(run(f.home, "read", f.keyboard, 262145).status, 4);
 });
