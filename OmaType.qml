@@ -444,7 +444,7 @@ Item {
         var count = root.activeSettings.test.mode === "words" ? root.activeSettings.test.words : 320
         activeLanguage = root.activeSettings.test.language
         generationBatch = 0
-        generated = Generator.generate({
+        var nextGenerated = Generator.generate({
             mode: root.activeSettings.test.mode,
             amount: count,
             seed: seed,
@@ -452,7 +452,10 @@ Item {
             punctuation: root.activeSettings.test.punctuation && !root.programmingLanguage,
             numbers: root.activeSettings.test.numbers && !root.programmingLanguage
         })
-        typing = TypingState.create(generated.text)
+        // Publishing the model creates delegates synchronously. Prepare their
+        // typing state first so they never observe a new prompt with null state.
+        typing = TypingState.create(nextGenerated.text)
+        generated = nextGenerated
         samples = []
         sampledKeystrokes = 0
         lastSampleMs = 0
@@ -1671,6 +1674,7 @@ Item {
                                             y: 0
                                             text: wordDelegate.word.charAt(index)
                                             color: {
+                                                if (!root.typing) return root.mutedColor
                                                 var globalIndex = wordDelegate.globalStart + index
                                                 var typed = root.typing && globalIndex < root.typing.cursor
                                                 var status = typed ? root.typing.status[globalIndex] : ""
