@@ -20,6 +20,13 @@ Item {
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
 
+    function launchPayload() {
+        var window = button.QsWindow.window
+        var screenName = window && window.screen ? String(window.screen.name || "") : ""
+        if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(screenName)) return "'{}'"
+        return "'{\"screen\":\"" + screenName + "\"}'"
+    }
+
     function finishHistoryRead(text, exists, error) {
         var document = null
         if (!error && !exists) document = History.clear()
@@ -65,7 +72,7 @@ Item {
         slotSize: Style.bar.iconSlot
         onPressed: function(mouseButton) {
             if (mouseButton === Qt.LeftButton && root.bar)
-                root.bar.run("omarchy-shell shell toggle jobo.omatype '{}'")
+                root.bar.run("omarchy-shell shell toggle jobo.omatype " + root.launchPayload())
         }
     }
 }

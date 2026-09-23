@@ -27,6 +27,34 @@ test("overlay owns the real Quattro lifecycle and layer surface", () => {
   ]);
 });
 
+test("overlay targets the invoking bar output or focused Hyprland monitor", () => {
+  const overlay = read("OmaType.qml");
+  const bar = read("BarWidget.qml");
+  includesAll(overlay, [
+    "import Quickshell.Hyprland",
+    "property var pendingOpenScreen: null",
+    "property var surfaceScreen: null",
+    "function screenByName(name)",
+    "function resolveLaunchScreen(payload)",
+    "Hyprland.focusedMonitor",
+    "root.pendingOpenScreen = capturedScreen",
+    "root.surfaceScreen = capturedScreen",
+    "screen: root.surfaceScreen ||",
+    "function moveToNextScreen()",
+    "if (reopen) root.opened = false",
+    "Quickshell.screens[(currentIndex + 1) % Quickshell.screens.length]",
+    "event.key === Qt.Key_M && controlHeld && altHeld",
+    "ctrl+alt+m  move display",
+    "Accessible.name: \"Move OmaType to the next display\""
+  ]);
+  includesAll(bar, [
+    "function launchPayload()",
+    "button.QsWindow.window",
+    "window.screen.name",
+    "root.bar.run(\"omarchy-shell shell toggle jobo.omatype \" + root.launchPayload())"
+  ]);
+});
+
 test("overlay translates Monkeytype geometry through Omarchy semantic colors", () => {
   const q = read("OmaType.qml");
   includesAll(q, [
@@ -247,7 +275,7 @@ test("bar widget uses the supported Quattro bar host contract", () => {
     "BarIconButton",
     "bar: root.bar",
     "tooltipText:",
-    `root.bar.run("omarchy-shell shell toggle jobo.omatype '{}'")`,
+    `root.bar.run("omarchy-shell shell toggle jobo.omatype " + root.launchPayload())`,
     "Components.SecureFile",
     "loading history…",
     "lastWpm"

@@ -17,6 +17,7 @@ All notable changes to OmaType are documented here.
 - Results now persist effective test modifiers, completion reason, metrics version, elapsed time, local day, timezone offset, and bounded interval samples.
 - Local persistence now uses bounded, no-follow descriptor reads and private atomic writes, rejecting symlinks on read, special files, oversized content, invalid UTF-8, unsafe path components, and excessive history structures; settings from newer schemas remain untouched.
 - Settings and history saves are revision-checked, conflicting history operations rebase onto the latest document, untrusted seed text is forced to plain rendering, and CSV export neutralizes spreadsheet-formula prefixes.
+- The overlay now opens on the bar widget’s output or the currently focused Hyprland monitor instead of always targeting the first monitor, and `Ctrl+Alt+M` moves it to the next display.
 
 ## [0.1.0] - 2026-08-28
 

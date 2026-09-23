@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.Commons
 import "src/generator.js" as Generator
@@ -61,6 +62,8 @@ Item {
     property bool legacySettingsExists: false
     property var legacySettingsValue: null
     property string pendingOpenPayload: ""
+    property var pendingOpenScreen: null
+    property var surfaceScreen: null
     // Epoch milliseconds exceed a QML int. Keeping this as double prevents
     // elapsed time from collapsing to one millisecond on real sessions.
     property double nowMs: Date.now()
@@ -370,11 +373,54 @@ Item {
         )
     }
 
+    function screenByName(name) {
+        var target = String(name || "")
+        for (var index = 0; index < Quickshell.screens.length; ++index) {
+            var candidate = Quickshell.screens[index]
+            if (candidate && String(candidate.name || "") === target) return candidate
+        }
+        return null
+    }
+
+    function resolveLaunchScreen(payload) {
+        var requested = payload && typeof payload.screen === "string" && payload.screen.length <= 128
+            ? payload.screen : ""
+        var requestedScreen = root.screenByName(requested)
+        if (requestedScreen) return requestedScreen
+        var focusedMonitor = Hyprland.focusedMonitor
+        var focusedScreen = root.screenByName(focusedMonitor ? focusedMonitor.name : "")
+        if (focusedScreen) return focusedScreen
+        return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+    }
+
+    function moveToNextScreen() {
+        if (Quickshell.screens.length < 2) return false
+        var currentName = root.surfaceScreen ? String(root.surfaceScreen.name || "") : ""
+        var currentIndex = -1
+        for (var index = 0; index < Quickshell.screens.length; ++index) {
+            if (String(Quickshell.screens[index].name || "") === currentName) {
+                currentIndex = index
+                break
+            }
+        }
+        var reopen = root.opened
+        if (reopen) root.opened = false
+        root.surfaceScreen = Quickshell.screens[(currentIndex + 1) % Quickshell.screens.length]
+        Qt.callLater(function() {
+            if (reopen) root.opened = true
+            Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+        })
+        return true
+    }
+
     function open(payloadJson) {
         var payload = IpcPolicy.parsePayload(payloadJson)
         if (payload === null) return
+        var capturedScreen = root.pendingOpenScreen || root.resolveLaunchScreen(payload)
+        root.pendingOpenScreen = null
         if (!root.settingsReady) {
             root.pendingOpenPayload = JSON.stringify(payload)
+            root.pendingOpenScreen = capturedScreen
             return
         }
         var activeRunBeforeAutomation = root.opened && root.focusMode
@@ -385,6 +431,7 @@ Item {
         if (Object.prototype.hasOwnProperty.call(payload, "setting") && !validSettingPayload) return
         var validResetPayload = settingsCategories.indexOf(payload.resetCategory) >= 0
         if (Object.prototype.hasOwnProperty.call(payload, "resetCategory") && !validResetPayload) return
+        root.surfaceScreen = capturedScreen
         if (!root.opened) root.loadSettings(true)
         root.applyAutomationTransaction(payload, validSettingPayload, validResetPayload)
         if ((validSettingPayload || validResetPayload) && activeRunBeforeAutomation) {
@@ -414,10 +461,12 @@ Item {
         seed = typeof payload.seed === "string" && payload.seed.length > 0
             ? String(payload.seed).slice(0, 128)
             : "omatype-" + Date.now()
-        opened = true
         newTest()
         if (settingsOpen) Qt.callLater(function() { settingsPanel.currentSection = requestedSettingsSection })
-        Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+        Qt.callLater(function() {
+            root.opened = true
+            Qt.callLater(function() { keyboardRoot.forceActiveFocus() })
+        })
     }
 
     function close() {
@@ -1059,7 +1108,7 @@ Item {
     PanelWindow {
         id: surface
 
-        screen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+        screen: root.surfaceScreen || (Quickshell.screens.length > 0 ? Quickshell.screens[0] : null)
         visible: root.opened
         color: root.backgroundColor
         exclusionMode: ExclusionMode.Ignore
@@ -1083,6 +1132,12 @@ Item {
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
                 var controlHeld = (event.modifiers & Qt.ControlModifier) !== 0
+                var altHeld = (event.modifiers & Qt.AltModifier) !== 0
+                if (event.key === Qt.Key_M && controlHeld && altHeld) {
+                    root.moveToNextScreen()
+                    event.accepted = true
+                    return
+                }
                 if (event.key === Qt.Key_Escape && (event.modifiers & Qt.ControlModifier)) {
                     root.dismiss()
                     event.accepted = true
@@ -1857,6 +1912,17 @@ Item {
                     Text { text: "ctrl+r  restart"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text { visible: !!root.result; text: "enter  next"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
                     Text { text: "ctrl+esc  close"; color: root.mutedColor; font.family: root.typeface; font.pixelSize: 12 }
+                    Text {
+                        visible: Quickshell.screens.length > 1
+                        text: "ctrl+alt+m  move display"
+                        color: root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 12
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Move OmaType to the next display"
+                        Accessible.onPressAction: root.moveToNextScreen()
+                        MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.moveToNextScreen() }
+                    }
                     Text {
                         text: "ctrl+h  progress"
                         color: root.progressOpen ? root.accentColor : root.mutedColor
