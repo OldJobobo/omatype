@@ -40,7 +40,7 @@ omarchy plugin add https://github.com/OldJobobo/omatype.git --enable
 > [!NOTE]
 > Omarchy’s current add/update commands follow the repository’s mutable branch head; they are not bound to the exact commit checked by the marketplace. Marketplace validation is a limited, commit-specific static check—not a security audit or guarantee.
 
-Once enabled, select **OmaType** from the bar and begin typing. You can also open it directly:
+Once enabled, select **OmaType** from the bar and begin typing. It opens on that bar’s display; direct launches use the focused Hyprland monitor. You can also open it directly:
 
 ```sh
 omarchy-shell shell toggle jobo.omatype '{}'
@@ -65,6 +65,7 @@ For a pointer-free launch, assign that command to an available shortcut through 
 | Open progress | `Ctrl+H` |
 | Open settings | `Ctrl+,` |
 | Close OmaType | `Ctrl+Escape` |
+| Move to the next display | `Ctrl+Alt+M` |
 
 `Enter` starts the next test from the results screen and can optionally end an active test early. The quick-restart key can be set to `Tab`, `Escape`, `Enter`, or disabled; `Ctrl+R` always works.
 
