@@ -10,7 +10,8 @@ const MODES = ["time", "words"];
 const AMOUNTS = {time: [15, 30, 60, 120], words: [10, 25, 50, 100]};
 const COMPLETIONS = ["completed", "quick-ended", "legacy-unknown"];
 const LANGUAGE_IDS = [
-  "english", "ada", "assembly", "bash", "c", "clojure", "cpp", "csharp", "css",
+  "english", "german", "spanish", "french", "italian", "portuguese", "dutch",
+  "ada", "assembly", "bash", "c", "clojure", "cpp", "csharp", "css",
   "dart", "elixir", "go", "haskell", "html", "java", "javascript", "json", "julia",
   "kotlin", "lua", "nix", "objective-c", "ocaml", "perl", "php", "powershell",
   "python", "r", "ruby", "rust", "scala", "solidity", "sql", "swift", "typescript",

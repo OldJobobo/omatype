@@ -13,7 +13,8 @@ const TYPED_EFFECTS = ["keep", "fade", "hide"];
 const ERROR_STYLES = ["color", "underline", "both"];
 const GOAL_METRICS = ["tests", "minutes", "characters"];
 const LANGUAGE_IDS = [
-  "english", "ada", "assembly", "bash", "c", "clojure", "cpp", "csharp", "css",
+  "english", "german", "spanish", "french", "italian", "portuguese", "dutch",
+  "ada", "assembly", "bash", "c", "clojure", "cpp", "csharp", "css",
   "dart", "elixir", "go", "haskell", "html", "java", "javascript", "json", "julia",
   "kotlin", "lua", "nix", "objective-c", "ocaml", "perl", "php", "powershell",
   "python", "r", "ruby", "rust", "scala", "solidity", "sql", "swift", "typescript",

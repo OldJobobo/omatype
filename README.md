@@ -20,14 +20,14 @@ Timed and word tests in a focused interface that follows your active theme—wit
 
 - Run **15, 30, 60, or 120-second** tests.
 - Choose **10, 25, 50, or 100-word** tests.
-- Add punctuation and numbers to English prompts.
-- Practice English or one of **36 programming-language vocabularies**, including Bash, Nix, Python, Rust, JavaScript, TypeScript, C/C++, Go, SQL, Swift, Zig, and more.
+- Add punctuation and numbers to natural-language prompts.
+- Practice **English, German, Spanish, French, Italian, Portuguese, or Dutch**, or choose one of **36 programming-language vocabularies** including Bash, Nix, Python, Rust, JavaScript, TypeScript, C/C++, Go, SQL, Swift, Zig, and more.
 - Review WPM, raw WPM, accuracy, consistency, character counts, and a second-by-second speed chart.
 - Track comparable pace, personal bests, recent accuracy, streaks, daily activity, goals, and same-setup language progress over time.
 - Inspect or delete retained results, clear history with confirmation, and export retained runs to CSV.
 - Tune the caret, timer, live metrics, typography, line geometry, focus behavior, motion, contrast, and error indicators.
 
-English prompts are generated from OmaType's original 229-word offline corpus. Programming packs contain original, project-curated keywords, operators, syntax terms, and common API identifiers.
+Each natural language uses a 500-word offline corpus. OmaType preserves its original English vocabulary and expands every pack with reviewed common-word data, native spelling, and diacritics. Programming packs contain original, project-curated keywords, operators, syntax terms, and common API identifiers. Vocabulary attribution is documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Install
 
@@ -80,7 +80,7 @@ For a pointer-free launch, assign that command to an available shortcut through 
 
 Progress comparisons default to the current exact mode, amount, language, punctuation, numbers, and metrics version. Mixed activity can be filtered by retained language, Time/Words mode, and amount for volume and streak inspection, but it is never presented as a combined WPM, accuracy, or personal best claim.
 
-Programming vocabularies preserve syntax tokens as written, so English punctuation and number transformations are unavailable while a programming language is selected.
+Programming vocabularies preserve syntax tokens as written, so punctuation and number transformations are unavailable while a programming language is selected. Natural-language packs support both transformations.
 
 ## Local by design
 
@@ -144,7 +144,7 @@ QML runtime validation requires Qt 6, Quickshell, and the Quattro plugin host. C
 | `src/` | Generator, typing state, metrics, sessions, schema-v2 history, progress aggregation, settings, layout, and language registry |
 | `components/progress/` | Keyboard-first progress view, pace charts, activity heatmap, and controls |
 | `components/SecureFile.qml` and `scripts/secure_file.py` | Bounded, no-follow local persistence boundary |
-| `data/words-en.json` | Original English word corpus |
+| `data/words-en.json` | Curated 500-word English corpus |
 | `tests/` | Dependency-free Node tests and QML contract checks |
 
 The overlay owns a full-screen `PanelWindow` and exclusive typing focus. Quattro keeps the plugin instance alive and calls `open(payloadJson)` and `close()`. The bar widget follows the supported `BarIconButton` contract and uses `bar.run(...)` to toggle `jobo.omatype` through `omarchy-shell`.

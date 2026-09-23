@@ -3,6 +3,13 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const Languages = require("../src/languages.js");
+const Generator = require("../src/generator.js");
+
+const expectedNaturalPacks = [
+  ["english", "English"], ["german", "Deutsch"], ["spanish", "Español"],
+  ["french", "Français"], ["italian", "Italiano"], ["portuguese", "Português"],
+  ["dutch", "Nederlands"]
+];
 
 const expectedProgrammingPacks = [
   "ada", "assembly", "bash", "c", "clojure", "cpp", "csharp", "css",
@@ -22,6 +29,20 @@ test("registry exposes an extensive original programming-language catalog", () =
   assert.ok(options.filter(option => option.category === "programming").length >= 36);
 });
 
+test("registry exposes curated common natural-language packs", () => {
+  const options = Languages.options();
+  assert.deepEqual(options.slice(0, expectedNaturalPacks.length).map(option => [option.id, option.label]), expectedNaturalPacks);
+  for (const [id] of expectedNaturalPacks) {
+    const pack = Languages.get(id);
+    assert.equal(pack.category, "natural");
+    assert.equal(pack.words.length, 500, `${id} natural vocabulary`);
+    if (id !== "english") assert.ok(pack.words.some(word => /[^\x00-\x7f]/.test(word)), `${id} native spelling`);
+    const generated = Generator.generate({words: pack.words, amount: 80, seed: `natural-${id}`, punctuation: true, numbers: true});
+    assert.equal(generated.words.length, 80);
+    assert.ok(generated.words.every(word => pack.words.some(source => word.startsWith(source))), `${id} generated vocabulary`);
+  }
+});
+
 test("every pack has bounded unique typing tokens and provenance metadata", () => {
   for (const option of Languages.options()) {
     const pack = Languages.get(option.id);
@@ -29,7 +50,9 @@ test("every pack has bounded unique typing tokens and provenance metadata", () =
     assert.ok(pack.words.length >= 24, `${option.id} vocabulary`);
     assert.equal(new Set(pack.words).size, pack.words.length, `${option.id} duplicates`);
     assert.ok(pack.words.every(word => typeof word === "string" && word.length >= 1 && word.length <= 40 && !/\s/.test(word)), option.id);
-    assert.equal(pack.origin, "OmaType original curated vocabulary");
+    assert.equal(pack.origin, option.category === "natural"
+      ? "OmaType curation with MIT-licensed thousand-most-common-words data"
+      : "OmaType original curated vocabulary");
   }
 });
 
