@@ -30,9 +30,13 @@ SETTINGS_CAP = 262_144
 LARGE_CAP = 16_777_216
 TARGETS = {
     (".config", "omarchy", "omatype-settings.json"): SETTINGS_CAP,
+    (".config", "omarchy", "omatype-keyboard.json"): SETTINGS_CAP,
     (".local", "state", "omarchy", "omatype-settings.json"): SETTINGS_CAP,
     (".local", "state", "omarchy", "omatype-history.json"): LARGE_CAP,
     (".local", "state", "omarchy", "omatype-history.csv"): LARGE_CAP,
+}
+READ_ONLY_TARGETS = {
+    (".config", "omarchy", "omatype-keyboard.json"),
 }
 DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 READ_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
@@ -81,6 +85,8 @@ def checked_request(argv: list[str]) -> tuple[str, str, tuple[str, ...], int, st
     allowed_cap = TARGETS.get(parts)
     if allowed_cap is None or cap <= 0 or cap > allowed_cap:
         raise BoundaryError("target path or byte cap is not allowed")
+    if operation == "write" and parts in READ_ONLY_TARGETS:
+        raise BoundaryError("target is read-only")
     return operation, home, parts, cap, expected
 
 

@@ -10,6 +10,7 @@ Rectangle {
     property color textColor: "#eeeeee"
     property color mutedColor: "#888888"
     property string fontFamily: "monospace"
+    property var keyboardLayoutOptions: ["engrammer", "qwerty", "custom"]
     property string currentSection: "test"
     readonly property var sections: ["test", "behavior", "display", "caret", "access"]
     signal settingChanged(string category, string key, var value)
@@ -246,6 +247,8 @@ Rectangle {
             OptionRow { compact: true; label: "focus header"; options: ["hide", "show"]; value: root.appearanceSettings.focusHideHeader ? "hide" : "show"; accentColor: root.accentColor; textColor: root.textColor; mutedColor: root.mutedColor; fillColor: root.backgroundColor; fontFamily: root.fontFamily; onSelected: value => root.settingChanged("appearance", "focusHideHeader", value === "hide") }
             OptionRow { compact: true; label: "focus setup"; options: ["hide", "show"]; value: root.appearanceSettings.focusHideSetup ? "hide" : "show"; accentColor: root.accentColor; textColor: root.textColor; mutedColor: root.mutedColor; fillColor: root.backgroundColor; fontFamily: root.fontFamily; onSelected: value => root.settingChanged("appearance", "focusHideSetup", value === "hide") }
             OptionRow { compact: true; label: "focus footer"; options: ["hide", "show"]; value: root.appearanceSettings.focusHideFooter ? "hide" : "show"; accentColor: root.accentColor; textColor: root.textColor; mutedColor: root.mutedColor; fillColor: root.backgroundColor; fontFamily: root.fontFamily; onSelected: value => root.settingChanged("appearance", "focusHideFooter", value === "hide") }
+            OptionRow { compact: true; label: "keyboard guide"; detail: "ctrl+k toggles while typing"; options: ["show", "hide"]; value: root.appearanceSettings.keyboardGuide ? "show" : "hide"; accentColor: root.accentColor; textColor: root.textColor; mutedColor: root.mutedColor; fillColor: root.backgroundColor; fontFamily: root.fontFamily; onSelected: value => root.settingChanged("appearance", "keyboardGuide", value === "show") }
+            OptionRow { compact: true; label: "keyboard layout"; detail: "custom reads ~/.config/omarchy/omatype-keyboard.json"; options: root.keyboardLayoutOptions; value: root.appearanceSettings.keyboardLayout; accentColor: root.accentColor; textColor: root.textColor; mutedColor: root.mutedColor; fillColor: root.backgroundColor; fontFamily: root.fontFamily; onSelected: value => root.settingChanged("appearance", "keyboardLayout", value) }
         }
 
         Column {

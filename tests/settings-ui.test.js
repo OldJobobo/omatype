@@ -44,7 +44,7 @@ test("settings drawer is componentized into navigable local sections", () => {
     "timer", "live wpm", "live accuracy", "highlight", "typed text", "smooth scroll",
     "lines", "font size", "line width", "line height", "word spacing",
     "caret style", "caret motion", "caret color", "blink", "blink speed", "custom caret color", "thickness",
-    "reduced motion", "high contrast", "error indicator"
+    "keyboard guide", "keyboard layout", "reduced motion", "high contrast", "error indicator"
   ]) assert.ok(drawer.includes(setting), setting);
   includesAll(row, ["property string label", "property var options", "property var value", "property bool compact", "property bool narrowLayout: width < 620", "signal selected(var value)", "implicitHeight: narrowLayout ? 68 : (compact ? 36 : Math.max(52, choiceRow.implicitHeight + 18))", "height: implicitHeight", "id: choiceViewport", "contentWidth: choiceRow.implicitWidth", "interactive: root.narrowLayout && contentWidth > width", "clip: root.narrowLayout"]);
 });
