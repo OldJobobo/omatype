@@ -4,10 +4,13 @@ All notable changes to OmaType are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-22
+
 ### Added
 
 - A persistent, keyboard-first progress view with strict current-setup comparisons, paired net/raw pace charts, retained-result detail, historical interval curves, 90-day activity, streaks, totals, daily goals, and same-setup language comparisons.
 - Confirmed selective deletion, confirmed history clearing, and local CSV export for retained runs.
+- German, Spanish, French, Italian, Portuguese, and Dutch practice packs alongside English, with 500-word natural-language corpora and bundled attribution.
 
 ### Changed
 
@@ -15,6 +18,11 @@ All notable changes to OmaType are documented here.
 - Results now persist effective test modifiers, completion reason, metrics version, elapsed time, local day, timezone offset, and bounded interval samples.
 - Local persistence now uses bounded, no-follow descriptor reads and private atomic writes, rejecting symlinks on read, special files, oversized content, invalid UTF-8, unsafe path components, and excessive history structures; settings from newer schemas remain untouched.
 - Settings and history saves are revision-checked, conflicting history operations rebase onto the latest document, untrusted seed text is forced to plain rendering, and CSV export neutralizes spreadsheet-formula prefixes.
+- The overlay now opens on the bar widget’s output or the currently focused Hyprland monitor instead of always targeting the first monitor, and `Ctrl+Alt+M` moves it to the next display.
+
+### Fixed
+
+- Character color bindings now handle uninitialized typing state safely, and new tests initialize that state before publishing their word delegates, preventing startup null-reference warning bursts (#1).
 
 ## [0.1.0] - 2026-08-28
 
