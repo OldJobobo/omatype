@@ -58,10 +58,10 @@ test("overlay targets the invoking bar output or focused Hyprland monitor", () =
 test("overlay translates Monkeytype geometry through Omarchy semantic colors", () => {
   const q = read("OmaType.qml");
   includesAll(q, [
-    "Color.background",
-    "Color.accent",
-    "Color.foreground",
-    "Style.font.family",
+    "Commons.Color.background",
+    "Commons.Color.accent",
+    "Commons.Color.foreground",
+    "Commons.Style.font.family",
     "width * 0.10",
     "font.pixelSize: root.runtimeSettings.appearance.fontSize",
     "height: root.runtimeSettings.appearance.lineHeight",
@@ -79,6 +79,27 @@ test("overlay translates Monkeytype geometry through Omarchy semantic colors", (
   ]);
   assert.doesNotMatch(q, /readonly property color backgroundColor: "#323437"/);
   assert.doesNotMatch(q, /textFormat: Text\.RichText/);
+});
+
+test("overlay namespaces host colors to avoid Qt 6.12 Color shadowing", () => {
+  const q = read("OmaType.qml");
+  includesAll(q, [
+    "import qs.Commons as Commons",
+    "Commons.Color.background",
+    "Commons.Color.accent",
+    "Commons.Color.foreground",
+    "Commons.Color.muted",
+    "Commons.Color.urgent",
+    "Commons.Style.normalFill",
+    "Commons.Style.font.family"
+  ]);
+  assert.doesNotMatch(q, /(?<![\w.])(?:Color|Style)\./);
+});
+
+test("glyph positions fall back while a new prompt awaits matching layout", () => {
+  includesAll(read("OmaType.qml"), [
+    "wordDelegate.geometry.offsets && wordDelegate.geometry.offsets[index] !== undefined ? wordDelegate.geometry.offsets[index] : index * root.characterWidth"
+  ]);
 });
 
 test("header uses the OmaType product name and omits redundant offline status", () => {

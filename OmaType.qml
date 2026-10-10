@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
-import qs.Commons
+import qs.Commons as Commons
 import "src/generator.js" as Generator
 import "src/typing-state.js" as TypingState
 import "src/metrics.js" as Metrics
@@ -89,13 +89,14 @@ Item {
     readonly property var currentLanguagePack: Languages.get(root.language)
     readonly property var activeLanguagePack: Languages.get(root.activeLanguage)
     readonly property bool programmingLanguage: activeLanguagePack.category === "programming"
-    readonly property color backgroundColor: Color.background
-    readonly property color accentColor: Color.accent
-    readonly property color textColor: Color.foreground
-    readonly property color mutedColor: root.runtimeSettings.accessibility.highContrast ? root.textColor : Color.muted
-    readonly property color errorColor: Color.urgent
-    readonly property color controlColor: Style.normalFill
-    readonly property string typeface: Style.font.family
+    // Qt 6.12 also exports Color; qualify the host singleton to avoid shadowing.
+    readonly property color backgroundColor: Commons.Color.background
+    readonly property color accentColor: Commons.Color.accent
+    readonly property color textColor: Commons.Color.foreground
+    readonly property color mutedColor: root.runtimeSettings.accessibility.highContrast ? root.textColor : Commons.Color.muted
+    readonly property color errorColor: Commons.Color.urgent
+    readonly property color controlColor: Commons.Style.normalFill
+    readonly property string typeface: Commons.Style.font.family
     readonly property bool focusMode: typing && typing.startedAt !== null && !result
     readonly property int elapsedMs: typing && typing.startedAt !== null ? nowMs - typing.startedAt : 0
     readonly property int remainingSeconds: Math.max(0, activeAmount - Math.floor(elapsedMs / 1000))
@@ -107,6 +108,16 @@ Item {
     })
     readonly property int activeWordIndex: wordIndexAt(typing ? typing.cursor : 0)
     readonly property real characterWidth: root.runtimeSettings.appearance.fontSize * 0.6016
+
+    FontMetrics {
+        id: typingFontMetrics
+        font.family: root.typeface
+        font.pixelSize: root.runtimeSettings.appearance.fontSize
+        font.weight: Font.Medium
+        font.kerning: false
+    }
+
+    onTypefaceChanged: Qt.callLater(function() { root.rebuildWordLayout(wordsClip.width) })
     readonly property int caretSmoothDuration: {
         if (root.runtimeSettings.accessibility.reducedMotion) return 0
         var smooth = root.runtimeSettings.caret.smooth
@@ -364,12 +375,21 @@ Item {
     }
 
     function rebuildWordLayout(viewportWidth) {
+        var words = root.generated && root.generated.words ? root.generated.words : []
+        var widths = ({})
+        var advances = words.map(function(word) {
+            return word.split("").map(function(letter) {
+                if (widths[letter] === undefined) widths[letter] = typingFontMetrics.advanceWidth(letter)
+                return widths[letter]
+            })
+        })
         root.wordLayout = Layout.centeredWords(
-            root.generated && root.generated.words ? root.generated.words : [],
+            words,
             Math.max(1, viewportWidth),
             root.characterWidth,
             root.runtimeSettings.appearance.wordSpacing,
-            root.runtimeSettings.appearance.lineHeight
+            root.runtimeSettings.appearance.lineHeight,
+            advances
         )
     }
 
@@ -1725,9 +1745,10 @@ Item {
                                         model: wordDelegate.word.length
                                         delegate: Text {
                                             required property int index
-                                            x: index * root.characterWidth
+                                            x: wordDelegate.geometry.offsets && wordDelegate.geometry.offsets[index] !== undefined ? wordDelegate.geometry.offsets[index] : index * root.characterWidth
                                             y: 0
                                             text: wordDelegate.word.charAt(index)
+                                            renderType: Text.NativeRendering
                                             color: {
                                                 if (!root.typing) return root.mutedColor
                                                 var globalIndex = wordDelegate.globalStart + index
@@ -1752,6 +1773,7 @@ Item {
                                             font.family: root.typeface
                                             font.pixelSize: root.runtimeSettings.appearance.fontSize
                                             font.weight: Font.Medium
+                                            font.kerning: false
                                             font.underline: {
                                                 if (!root.typing) return false
                                                 var globalIndex = wordDelegate.globalStart + index
@@ -1766,9 +1788,10 @@ Item {
                                         id: caret
                                         readonly property string style: root.runtimeSettings.caret.style
                                         visible: root.activeWordIndex === wordDelegate.index && !root.result && style !== "off"
-                                        x: Math.min(wordDelegate.word.length, Math.max(0, root.typing ? root.typing.cursor - wordDelegate.globalStart : 0)) * root.characterWidth - 1
+                                        readonly property int caretIndex: Math.min(wordDelegate.word.length, Math.max(0, root.typing ? root.typing.cursor - wordDelegate.globalStart : 0))
+                                        x: (wordDelegate.geometry.offsets ? wordDelegate.geometry.offsets[caretIndex] : caretIndex * root.characterWidth) - 1
                                         y: style === "underline" ? root.runtimeSettings.appearance.fontSize + 3 : Math.max(1, (root.runtimeSettings.appearance.lineHeight - root.runtimeSettings.appearance.fontSize) / 2)
-                                        width: style === "default" ? root.runtimeSettings.caret.thickness : root.characterWidth
+                                        width: style === "default" ? root.runtimeSettings.caret.thickness : wordDelegate.geometry.offsets ? (wordDelegate.geometry.offsets[Math.min(caretIndex + 1, wordDelegate.word.length)] - wordDelegate.geometry.offsets[caretIndex] || root.characterWidth) : root.characterWidth
                                         height: style === "underline" ? root.runtimeSettings.caret.thickness : root.runtimeSettings.appearance.fontSize
                                         radius: style === "default" || style === "underline" ? 1 : 2
                                         color: style === "outline" ? "transparent" : root.caretColor

@@ -9,6 +9,21 @@ function available(command) {
   return spawnSync("bash", ["-lc", `command -v ${command}`], {encoding: "utf8"}).status === 0;
 }
 
+test("Qt font metrics and native glyph rendering are available in Quickshell", {timeout: 10000}, t => {
+  if (!available("qs") || !process.env.WAYLAND_DISPLAY) return t.skip("Quickshell Wayland runtime unavailable");
+  const fixture = path.join(__dirname, "fixtures", "FontRuntime.qml");
+  const result = spawnSync("qs", ["-p", fixture, "--no-color"], {
+    encoding: "utf8",
+    timeout: 8000,
+    env: Object.assign({}, process.env, {QT_LOGGING_RULES: "qt.qpa.services=false;quickshell.qmlscanner=false"})
+  });
+  const output = String(result.stdout || "") + String(result.stderr || "");
+  assert.equal(result.error, undefined, output);
+  assert.equal(result.status, 0, output);
+  assert.match(output, /FONT_HARNESS_OK/);
+  assert.doesNotMatch(output, /FONT_HARNESS_FAILURE|TypeError|ReferenceError/);
+});
+
 test("visible narrow ProgressView runtime covers exact filter reveal and existing contracts without warnings", {timeout: 10000}, t => {
   if (!available("qs") || !process.env.WAYLAND_DISPLAY) return t.skip("Quickshell Wayland runtime unavailable");
   const fixture = path.join(__dirname, "fixtures", "ProgressRuntime.qml");

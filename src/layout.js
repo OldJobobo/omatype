@@ -5,7 +5,7 @@ function finitePositive(value, fallback) {
     return Number.isFinite(number) && number > 0 ? number : fallback
 }
 
-function centeredWords(words, viewportWidth, characterWidth, spacing, lineHeight) {
+function centeredWords(words, viewportWidth, characterWidth, spacing, lineHeight, advances) {
     if (!Array.isArray(words) || words.length === 0) return []
 
     var viewport = finitePositive(viewportWidth, 1)
@@ -19,10 +19,10 @@ function centeredWords(words, viewportWidth, characterWidth, spacing, lineHeight
 
     function flush() {
         if (pending.length === 0) return
-        var x = Math.max(0, (viewport - pendingWidth) / 2)
+        var x = Math.max(0, Math.round((viewport - pendingWidth) / 2))
         for (var i = 0; i < pending.length; ++i) {
             var item = pending[i]
-            output.push({index: item.index, x: x, y: row * line, width: item.width})
+            output.push({index: item.index, x: x, y: row * line, width: item.width, offsets: item.offsets})
             x += item.width
         }
         pending = []
@@ -32,9 +32,17 @@ function centeredWords(words, viewportWidth, characterWidth, spacing, lineHeight
 
     for (var index = 0; index < words.length; ++index) {
         var word = typeof words[index] === "string" ? words[index] : String(words[index] || "")
-        var width = word.length * glyph + gap
+        var offsets = [0]
+        var measured = Array.isArray(advances) && advances[index]
+        var advance = 0
+        for (var letter = 0; letter < word.length; ++letter) {
+            var widthForLetter = measured && finitePositive(measured[letter], 0) || glyph
+            advance += widthForLetter
+            offsets.push(Math.round(advance))
+        }
+        var width = offsets[word.length] + gap
         if (pending.length > 0 && pendingWidth + width > viewport) flush()
-        pending.push({index: index, width: width})
+        pending.push({index: index, width: width, offsets: offsets})
         pendingWidth += width
         if (width > viewport) flush()
     }

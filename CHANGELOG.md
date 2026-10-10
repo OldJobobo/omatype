@@ -4,6 +4,14 @@ All notable changes to OmaType are documented here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-09
+
+### Fixed
+
+- Qualified Quattro's Commons imports so Qt 6.12's `Color` type no longer shadows the host theme singleton or leaves overlay colors undefined.
+- Typing glyphs now use measured font advances and native rendering, with pixel-aligned word layout and caret stops instead of assuming every font has the same fixed character width.
+- Glyph positions fall back safely while a new prompt awaits its matching layout, preventing transient undefined-position warnings.
+
 ## [0.2.0] - 2026-09-22
 
 ### Added
