@@ -12,7 +12,8 @@ function includesAll(source, values) {
 test("SecureFile uses fixed argv, isolated Python, revision CAS, framed stdin, and timeouts", () => {
   const qml = read("components/SecureFile.qml");
   includesAll(qml, [
-    '["/usr/bin/python3", "-I", "-S", root.helperPath, operation, root.path, String(root.maxBytes)]',
+    'property string helperInterpreter: "/usr/bin/python3"',
+    '[root.helperInterpreter, "-I", "-S", root.helperPath, operation, root.path, String(root.maxBytes)]',
     'if (operation === "write") result.push(expectedRevision)',
     "clearEnvironment: true",
     '"HOME": Quickshell.env("HOME")',
@@ -34,6 +35,43 @@ test("SecureFile uses fixed argv, isolated Python, revision CAS, framed stdin, a
     "writeProcess.signal(9)"
   ]);
   assert.doesNotMatch(qml, /(?:bash|sh)\s*,\s*"-c"|execDetached|startDetached|SplitParser/);
+  // Only fixtures may point the helper at another interpreter.
+  for (const name of ["OmaType.qml", "BarWidget.qml"]) assert.doesNotMatch(read(name), /helperInterpreter/, name);
+});
+
+test("persistence failures are visible in the overlay footer and bar tooltip", () => {
+  const overlay = read("OmaType.qml");
+  includesAll(overlay, [
+    'property string persistenceStatus: ""',
+    "readonly property string footerStatus",
+    "function shortError(error)",
+    'if (error) root.persistenceStatus = "settings unavailable · " + root.shortError(error)',
+    'root.persistenceStatus = "history unavailable · " + root.shortError(error)',
+    'root.settingsStatus = "settings were not saved · " + root.shortError(error)'
+  ]);
+  const footer = overlay.slice(overlay.indexOf("text: root.footerStatus"), overlay.indexOf("}", overlay.indexOf("text: root.footerStatus")));
+  includesAll(footer, ["textFormat: Text.PlainText"]);
+  includesAll(read("BarWidget.qml"), ['property string historyError: ""', 'root.historyError = error ? String(error) : ""', "OmaType • history unavailable"]);
+});
+
+test("SecureFile reports a helper that cannot start instead of waiting forever", () => {
+  const qml = read("components/SecureFile.qml");
+  includesAll(qml, [
+    "property int startGraceMs",
+    "property int handledGeneration: 0",
+    "function readStartFailed()",
+    "function writeStartFailed()",
+    'root.loadFailed("secure helper could not start")',
+    'root.saveFailed("secure helper could not start")',
+    "if (!readProcess.running) readGrace.restart()",
+    "if (!writeProcess.running) writeGrace.restart()",
+    "onRunningChanged:"
+  ]);
+  for (const process of ["readProcess", "writeProcess"]) {
+    const block = qml.slice(qml.indexOf(`id: ${process}`), qml.indexOf("Qt.callLater(root.continueQueue)", qml.indexOf(`id: ${process}`)));
+    includesAll(block, [`${process}.handledGeneration = ${process}.generation`, "onExited: function(exitCode)"]);
+    assert.ok(block.indexOf(`${process}.handledGeneration = ${process}.generation`) > block.indexOf("onExited"));
+  }
 });
 
 test("FileView is watcher-only and never carries OmaType content", () => {

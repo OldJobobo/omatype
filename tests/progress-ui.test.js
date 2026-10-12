@@ -23,7 +23,7 @@ test("overlay migrates legacy tests and serializes rollback-safe history writes"
     'root.historyConflictEffects = recoveryEffects',
     'root.historyReloadAfterFailure = true',
     'root.finishHistoryRead(text, exists, "")',
-    'onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }',
+    'root.finishHistoryRead("", false, error)',
     'onSaved: root.completeHistoryWrite(true, "", false)',
     'onSaveFailed: function(error) { root.completeHistoryWrite(false, error, false) }',
     'onSaveConflict: function(error) { root.completeHistoryWrite(false, error, true) }',

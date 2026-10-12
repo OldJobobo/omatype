@@ -11,6 +11,14 @@ Item {
     property bool watchChanges: false
     property bool compareAndSwap: true
     property int timeoutMs: 7000
+    // Quickshell reports a helper that cannot start (missing interpreter, bad
+    // permissions) only by flipping `running` back to false; `exited` never
+    // fires. After every stop, give `exited` this grace period and treat its
+    // absence as a start failure so callers never wait forever.
+    property int startGraceMs: 500
+    // The Omarchy contract is the system interpreter. Only test fixtures
+    // override this; the entry points never set it.
+    property string helperInterpreter: "/usr/bin/python3"
     property bool ready: false
     property bool exists: false
     property string revision: "unknown"
@@ -34,7 +42,7 @@ Item {
     visible: false
 
     function command(operation, expectedRevision) {
-        var result = ["/usr/bin/python3", "-I", "-S", root.helperPath, operation, root.path, String(root.maxBytes)]
+        var result = [root.helperInterpreter, "-I", "-S", root.helperPath, operation, root.path, String(root.maxBytes)]
         if (operation === "write") result.push(expectedRevision)
         return result
     }
@@ -71,6 +79,8 @@ Item {
         readProcess.command = root.command("read", "")
         readProcess.running = true
         readTimeout.restart()
+        // A synchronous start failure never toggles `running`.
+        if (!readProcess.running) readGrace.restart()
         return true
     }
 
@@ -120,6 +130,7 @@ Item {
         writeProcess.command = root.command("write", writeProcess.expectedRevision)
         writeProcess.running = true
         writeTimeout.restart()
+        if (!writeProcess.running) writeGrace.restart()
         return true
     }
 
@@ -132,6 +143,26 @@ Item {
         } else if (root.readQueued) {
             root.reload()
         }
+    }
+
+    function readStartFailed() {
+        readTimeout.stop()
+        readProcess.handledGeneration = readProcess.generation
+        if (readProcess.generation !== root.requestGeneration) return
+        root.ready = true
+        root.revision = "unknown"
+        root.loadFailed("secure helper could not start")
+        Qt.callLater(root.continueQueue)
+    }
+
+    function writeStartFailed() {
+        writeTimeout.stop()
+        writeProcess.handledGeneration = writeProcess.generation
+        writeProcess.payload = ""
+        writeProcess.frame = ""
+        if (writeProcess.generation !== root.requestGeneration) return
+        root.saveFailed("secure helper could not start")
+        Qt.callLater(root.continueQueue)
     }
 
     function rearmWatcher() {
@@ -165,6 +196,20 @@ Item {
     }
 
     Timer {
+        id: readGrace
+        interval: root.startGraceMs
+        repeat: false
+        onTriggered: if (!readProcess.running && readProcess.handledGeneration !== readProcess.generation) root.readStartFailed()
+    }
+
+    Timer {
+        id: writeGrace
+        interval: root.startGraceMs
+        repeat: false
+        onTriggered: if (!writeProcess.running && writeProcess.handledGeneration !== writeProcess.generation) root.writeStartFailed()
+    }
+
+    Timer {
         id: readTimeout
         interval: root.timeoutMs
         repeat: false
@@ -187,13 +232,20 @@ Item {
     Process {
         id: readProcess
         property int generation: 0
+        property int handledGeneration: 0
         property bool timedOut: false
         clearEnvironment: true
         environment: root.processEnvironment
         stdout: StdioCollector { id: readStdout; waitForEnd: true }
         stderr: StdioCollector { id: readStderr; waitForEnd: true }
+        onRunningChanged: {
+            if (readProcess.running) readGrace.stop()
+            else if (readProcess.handledGeneration !== readProcess.generation) readGrace.restart()
+        }
         onExited: function(exitCode) {
+            readGrace.stop()
             readTimeout.stop()
+            readProcess.handledGeneration = readProcess.generation
             if (readProcess.generation !== root.requestGeneration) return
             root.ready = true
             var nextRevision = root.controlRevision(readStderr.text)
@@ -219,6 +271,7 @@ Item {
     Process {
         id: writeProcess
         property int generation: 0
+        property int handledGeneration: 0
         property string payload: ""
         property string frame: ""
         property string expectedRevision: ""
@@ -228,8 +281,14 @@ Item {
         stdinEnabled: true
         stderr: StdioCollector { id: writeStderr; waitForEnd: true }
         onStarted: writeProcess.write(writeProcess.frame)
+        onRunningChanged: {
+            if (writeProcess.running) writeGrace.stop()
+            else if (writeProcess.handledGeneration !== writeProcess.generation) writeGrace.restart()
+        }
         onExited: function(exitCode) {
+            writeGrace.stop()
             writeTimeout.stop()
+            writeProcess.handledGeneration = writeProcess.generation
             writeProcess.payload = ""
             writeProcess.frame = ""
             if (writeProcess.generation !== root.requestGeneration) return

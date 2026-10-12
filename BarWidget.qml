@@ -11,6 +11,7 @@ Item {
     property var bar: null
     property bool historyReady: false
     property bool historyAvailable: false
+    property string historyError: ""
     readonly property bool supportedHistorySchema: root.historyAvailable && (historyAdapter.schemaVersion === 1 || historyAdapter.schemaVersion === 2)
     readonly property var visibleHistoryEntries: historyAdapter.schemaVersion === 1 && historyAdapter.entries.length === 0
         ? historyAdapter.tests : historyAdapter.entries
@@ -36,6 +37,7 @@ Item {
         }
         root.historyReady = true
         root.historyAvailable = !!document
+        root.historyError = error ? String(error) : ""
         if (!document) return
         historyAdapter.schemaVersion = document.schemaVersion
         historyAdapter.entries = document.entries || []
@@ -68,7 +70,7 @@ Item {
         bar: root.bar
         text: "󰌌"
         fontFamily: "JetBrainsMono Nerd Font"
-        tooltipText: !root.historyReady ? "OmaType • loading history…" : root.lastWpm > 0 ? "OmaType • " + Math.round(root.lastWpm) + " wpm" : "OmaType"
+        tooltipText: !root.historyReady ? "OmaType • loading history…" : root.historyError !== "" ? "OmaType • history unavailable" : root.lastWpm > 0 ? "OmaType • " + Math.round(root.lastWpm) + " wpm" : "OmaType"
         slotSize: Style.bar.iconSlot
         onPressed: function(mouseButton) {
             if (mouseButton === Qt.LeftButton && root.bar)

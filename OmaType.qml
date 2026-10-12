@@ -53,6 +53,10 @@ Item {
     property bool csvWritePending: false
     property bool settingsWritePending: false
     property string settingsStatus: ""
+    // Persistence failures the user would otherwise only see on the console.
+    property string persistenceStatus: ""
+    readonly property string footerStatus: [root.persistenceStatus, root.settingsOpen ? "" : root.settingsStatus]
+        .filter(function(part) { return part !== "" }).join("    · ")
     property bool settingsReady: false
     property bool settingsCurrentResolved: false
     property bool settingsCurrentExists: false
@@ -139,6 +143,10 @@ Item {
         if (item) activeWordY = item.y
     })
 
+    function shortError(error) {
+        return String(error || "").replace(/\s+/g, " ").trim().slice(0, 80)
+    }
+
     function isPrintable(text) {
         if (typeof text !== "string" || Array.from(text).length !== 1) return false
         var codePoint = text.codePointAt(0)
@@ -188,6 +196,7 @@ Item {
             root.settingsCurrentResolved = true
             root.settingsCurrentExists = exists || !!error
             root.settingsCurrentStatus = error ? "unavailable" : !exists ? "absent" : document.status
+            if (error) root.persistenceStatus = "settings unavailable · " + root.shortError(error)
             root.settingsCurrentValue = value
             if (root.settingsCurrentStatus === "unsupported") settingsStore.cancelQueuedWrite()
             if (value) root.applySettingsAdapter(settingsAdapter, value)
@@ -1030,7 +1039,10 @@ Item {
             else if (root.historyReloadAfterFailure)
                 root.finishHistoryRead(text, exists, "")
         }
-        onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }
+        onLoadFailed: function(error) {
+            root.persistenceStatus = "history unavailable · " + root.shortError(error)
+            root.finishHistoryRead("", false, error)
+        }
         onSaved: root.completeHistoryWrite(true, "", false)
         onSaveFailed: function(error) { root.completeHistoryWrite(false, error, false) }
         onSaveConflict: function(error) { root.completeHistoryWrite(false, error, true) }
@@ -1103,7 +1115,7 @@ Item {
         }
         onSaveFailed: function(error) {
             root.settingsWritePending = settingsStore.writePending
-            root.settingsStatus = "settings were not saved"
+            root.settingsStatus = "settings were not saved · " + root.shortError(error)
             console.warn("OmaType settings save failed: " + error)
         }
         onSaveConflict: function(error) {
@@ -1994,6 +2006,19 @@ Item {
                     color: root.mutedColor
                     font.family: root.typeface
                     font.pixelSize: 11
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: surface.height - 58
+                    visible: root.footerStatus !== "" && !root.focusMode
+                    text: root.footerStatus
+                    textFormat: Text.PlainText
+                    color: root.errorColor
+                    font.family: root.typeface
+                    font.pixelSize: 11
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: root.footerStatus
                 }
             }
         }

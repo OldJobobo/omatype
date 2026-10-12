@@ -78,8 +78,12 @@ test("SecureFile runtime covers CAS queues, external replacements, and future-sc
   const output = String(result.stdout || "") + String(result.stderr || "");
   assert.equal(result.error, undefined, output);
   assert.equal(result.status, 0, output);
-  assert.match(output, /SECURE_HARNESS_OK: CAS queue, watcher reload, exact newlines, and future-schema cancellation/);
+  assert.match(output, /SECURE_HARNESS_OK: CAS queue, watcher reload, exact newlines, future-schema cancellation, and helper start failure/);
   assert.doesNotMatch(output, /SECURE_HARNESS_FAILURE|\bERROR\b|TypeError|ReferenceError/);
+  // The missing-interpreter store makes Quickshell warn once per failed start
+  // (one read, one write). Anything else is a real warning.
+  const expectedStartFailure = /Process failed to start.*omatype-test-interpreter/;
   const warnings = output.split("\n").filter(line => /\bWARN\b/.test(line));
-  assert.deepEqual(warnings, [], output);
+  assert.equal(warnings.filter(line => expectedStartFailure.test(line)).length, 2, output);
+  assert.deepEqual(warnings.filter(line => !expectedStartFailure.test(line)), [], output);
 });
