@@ -283,6 +283,22 @@ test("active runs stay isolated from config reloads and settings remain visible"
   ]);
 });
 
+test("own settings saves echo back without replacing the visible setup", () => {
+  const q = read("OmaType.qml");
+  includesAll(q, [
+    'property string settingsSavedRevision: ""',
+    "root.settingsSavedRevision = settingsStore.revision",
+    "var externalChange = settingsStore.revision !== root.settingsSavedRevision",
+    "root.loadSettings(externalChange)",
+    'settingsSavedRevision = ""'
+  ]);
+  assert.doesNotMatch(q, /if \(root\.settingsReady && value\) root\.loadSettings\(true\)/);
+  const saved = q.slice(q.indexOf("id: settingsStore"), q.indexOf("id: settingsAdapter"));
+  assert.ok(saved.indexOf("root.settingsSavedRevision = settingsStore.revision") > saved.indexOf("onSaved:"));
+  const closeBody = q.slice(q.indexOf("function close()"), q.indexOf("function dismiss()"));
+  includesAll(closeBody, ['settingsSavedRevision = ""']);
+});
+
 test("QML runtime modules avoid unsupported Node globals and globalThis fallbacks", () => {
   for (const file of ["src/typing-state.js", "src/history.js", "src/progress.js"]) {
     const source = read(file);

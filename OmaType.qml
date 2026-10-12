@@ -55,6 +55,9 @@ Item {
     property bool csvWritePending: false
     property bool settingsWritePending: false
     property string settingsStatus: ""
+    // Revision of the last settings document this instance wrote, so the
+    // watcher echo of our own save is told apart from an external edit.
+    property string settingsSavedRevision: ""
     // Persistence failures the user would otherwise only see on the console.
     property string persistenceStatus: ""
     readonly property string footerStatus: [root.persistenceStatus, root.settingsOpen ? "" : root.settingsStatus]
@@ -202,7 +205,13 @@ Item {
             root.settingsCurrentValue = value
             if (root.settingsCurrentStatus === "unsupported") settingsStore.cancelQueuedWrite()
             if (value) root.applySettingsAdapter(settingsAdapter, value)
-            if (root.settingsReady && value) root.loadSettings(true)
+            if (root.settingsReady && value) {
+                // Our own save echoes back through the watcher carrying the
+                // revision we just wrote. Only an external change may replace
+                // the visible setup, which can hold a one-shot IPC override.
+                var externalChange = settingsStore.revision !== root.settingsSavedRevision
+                root.loadSettings(externalChange)
+            }
         } else {
             root.legacySettingsResolved = true
             root.legacySettingsExists = exists || !!error
@@ -502,6 +511,7 @@ Item {
 
     function close() {
         opened = false
+        settingsSavedRevision = ""
         settingsOpen = false
         languagePanelOpen = false
         progressOpen = false
@@ -1112,6 +1122,7 @@ Item {
         onLoaded: function(text, exists) { root.finishSettingsRead(true, text, exists, "") }
         onLoadFailed: function(error) { root.finishSettingsRead(true, "", false, error) }
         onSaved: {
+            root.settingsSavedRevision = settingsStore.revision
             root.settingsWritePending = settingsStore.writePending
             root.settingsStatus = ""
         }
