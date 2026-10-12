@@ -20,6 +20,44 @@ test("ships the six standard presets without an Engrammer built-in", () => {
   assert.ok(Layouts.QWERTZ.layers[0].keys.some(item => item.label === "Q" && item.altGr === "@"));
 });
 
+test("remapped presets carry their own punctuation instead of QWERTY leftovers", () => {
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  for (const layout of Layouts.BUILT_INS) {
+    const main = layout.layers[0].keys.filter(item => !item.numpad && item.y >= 1 && item.y <= 4 && Array.from(item.label).length === 1);
+    const labels = main.map(item => item.label);
+    assert.deepEqual(labels.filter((label, index) => labels.indexOf(label) !== index), [], layout.id + " repeats a main-block key");
+    for (const letter of letters)
+      assert.equal(labels.filter(label => label === letter).length, 1, layout.id + " has exactly one " + letter);
+    for (const item of main.filter(candidate => letters.indexOf(candidate.label) >= 0))
+      assert.ok(item.shift === "" || item.shift === item.label, layout.id + " " + item.label + " shows a foreign shift legend " + item.shift);
+  }
+  const key = (layout, label) => layout.layers[0].keys.find(item => !item.numpad && item.label === label);
+  assert.equal(key(Layouts.DVORAK, ",").shift, "<");
+  assert.equal(key(Layouts.DVORAK, "'").shift, "\"");
+  assert.equal(key(Layouts.DVORAK, ";").shift, ":");
+  assert.equal(key(Layouts.DVORAK, "/").shift, "?");
+  assert.equal(key(Layouts.DVORAK, "[").y, 1);
+  assert.equal(key(Layouts.COLEMAK, ";").y, 2);
+  assert.equal(key(Layouts.COLEMAK, "O").y, 3);
+  assert.equal(key(Layouts.WORKMAN, ";").shift, ":");
+  assert.equal(key(Layouts.AZERTY, "&").shift, "1");
+  assert.equal(key(Layouts.AZERTY, "à").altGr, "@");
+  assert.equal(key(Layouts.AZERTY, "M").y, 3);
+  assert.equal(key(Layouts.AZERTY, ",").shift, "?");
+  assert.equal(key(Layouts.AZERTY, "<").shift, ">");
+  assert.ok(Layouts.AZERTY.layers[0].keys.some(item => item.label === "AltGr"));
+});
+
+test("built-in keys stay inside their declared bounds", () => {
+  for (const layout of Layouts.BUILT_INS) {
+    const layer = layout.layers[0];
+    for (const item of layer.keys) {
+      assert.ok(item.x + item.width <= layer.bounds.width + 0.001, layout.id + " " + item.label);
+      assert.ok(item.y + item.height <= layer.bounds.height + 0.001, layout.id + " " + item.label);
+    }
+  }
+});
+
 test("marks only the numeric cluster as numpad so shared labels stay unambiguous", () => {
   const keys = Layouts.QWERTY.layers[0].keys;
   const numpad = keys.filter(item => item.numpad);
@@ -72,6 +110,9 @@ test("bounds positioned layers with required geometry and thumb indices", () => 
   const positioned = keys => ({schemaVersion: 1, name: "Mine", layers: [{bounds: {width: 4, height: 2}, keys}]});
   assert.equal(Layouts.normalize(positioned([base])).layers[0].keys[0].label, "A");
   assert.equal(Layouts.normalize(positioned([{label: "A", x: -1, y: 0}])), null);
+  assert.equal(Layouts.normalize(positioned([{label: "A", x: 3.5, y: 0, width: 1, height: 1}])), null, "keys must end inside the bounds width");
+  assert.equal(Layouts.normalize(positioned([{label: "A", x: 0, y: 1.5, width: 1, height: 1}])), null, "keys must end inside the bounds height");
+  assert.equal(Layouts.normalize(positioned([{label: "A", x: 3, y: 1, width: 1, height: 1}])).layers[0].keys.length, 1);
   assert.equal(Layouts.normalize({schemaVersion: 1, layers: [{keys: [base]}]}), null, "positioned layers require bounds");
   assert.equal(Layouts.normalize({schemaVersion: 1, layers: [{bounds: {width: 4, height: 2}, keys: [base], layerThumbKeys: [3]}]}), null);
   assert.equal(Layouts.normalize(positioned(Array.from({length: 129}, () => base))), null);

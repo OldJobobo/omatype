@@ -72,11 +72,68 @@ function germanQwertz() {
   return layout;
 }
 
+// Character keys of the main block per row: number row, top row including the
+// key above Enter, home row, and bottom row.
+const CHARACTER_ROWS = {1: [0, 12.5], 2: [1.5, 13.6], 3: [1.8, 12], 4: [2.3, 11.5]};
+
+// Rewrites whole character rows so a remapped layout never keeps a QWERTY
+// label or shift legend on a key it moved. An entry is a plain letter or
+// [label, shift, altGr, shiftAltGr].
+function remappedLayout(id, name, description, rows) {
+  const layout = JSON.parse(JSON.stringify(QWERTY));
+  layout.id = id;
+  layout.name = name;
+  layout.description = description;
+  for (const y of Object.keys(rows)) {
+    const range = CHARACTER_ROWS[y];
+    const keys = layout.layers[0].keys.filter(item => item.y === Number(y) && item.x >= range[0] && item.x < range[1]);
+    keys.sort((a, b) => a.x - b.x);
+    if (keys.length !== rows[y].length) throw new Error(id + " row " + y + " expects " + keys.length + " keys");
+    rows[y].forEach((entry, index) => {
+      const legends = typeof entry === "string" ? [entry] : entry;
+      keys[index].label = legends[0];
+      keys[index].shift = legends[1] || "";
+      keys[index].altGr = legends[2] || "";
+      keys[index].shiftAltGr = legends[3] || "";
+    });
+  }
+  return layout;
+}
+
+const COLEMAK_PUNCTUATION = [[",", "<"], [".", ">"], ["/", "?"]];
+
+function frenchAzerty() {
+  const layout = remappedLayout("azerty", "AZERTY", "French AZERTY on a full-size ISO-style keyboard", {
+    1: [["²"], ["&", "1"], ["é", "2", "~"], ["\"", "3", "#"], ["'", "4", "{"], ["(", "5", "["], ["-", "6", "|"], ["è", "7", "`"], ["_", "8", "\\"], ["ç", "9", "^"], ["à", "0", "@"], [")", "°", "]"], ["=", "+", "}"]],
+    2: ["A", "Z", ["E", "", "€"], "R", "T", "Y", "U", "I", "O", "P", ["^", "¨"], ["$", "£", "¤"], ["*", "µ"]],
+    3: ["Q", "S", "D", "F", "G", "H", "J", "K", "L", "M", ["ù", "%"]],
+    4: ["W", "X", "C", "V", "B", "N", [",", "?"], [";", "."], [":", "/"], ["!", "§"]]
+  });
+  const keys = layout.layers[0].keys;
+  keys.find(item => item.label === "Shift" && item.x === 0 && item.y === 4).width = 1.2;
+  keys.push(placed("<", 1.3, 4, 0.9, ">"));
+  keys.find(item => item.label === "Alt" && item.x === 10.2 && item.y === 5).label = "AltGr";
+  return layout;
+}
+
 const QWERTZ = germanQwertz();
-const AZERTY = letterLayout("azerty", "AZERTY", "AZERTYUIOP", "QSDFGHJKLM", "WXCVBN");
-const DVORAK = letterLayout("dvorak", "Dvorak", "',.PYFGCRL", "AOEUIDHTNS", ";QJKXBMWVZ");
-const COLEMAK = letterLayout("colemak", "Colemak", "QWFPGJLUY", "ARSTDHNEIO", "ZXCVBKM");
-const WORKMAN = letterLayout("workman", "Workman", "QDRWBJFUP", "ASHTGYNEOI", "ZXMCVKL");
+const AZERTY = frenchAzerty();
+const DVORAK = remappedLayout("dvorak", "Dvorak", "Dvorak on a full-size ANSI keyboard", {
+  1: [["`", "~"], ["1", "!"], ["2", "@"], ["3", "#"], ["4", "$"], ["5", "%"], ["6", "^"], ["7", "&"], ["8", "*"], ["9", "("], ["0", ")"], ["[", "{"], ["]", "}"]],
+  2: [["'", "\""], [",", "<"], [".", ">"], "P", "Y", "F", "G", "C", "R", "L", ["/", "?"], ["=", "+"], ["\\", "|"]],
+  3: ["A", "O", "E", "U", "I", "D", "H", "T", "N", "S", ["-", "_"]],
+  4: [[";", ":"], "Q", "J", "K", "X", "B", "M", "W", "V", "Z"]
+});
+const COLEMAK = remappedLayout("colemak", "Colemak", "Colemak on a full-size ANSI keyboard", {
+  2: ["Q", "W", "F", "P", "G", "J", "L", "U", "Y", [";", ":"], ["[", "{"], ["]", "}"], ["\\", "|"]],
+  3: ["A", "R", "S", "T", "D", "H", "N", "E", "I", "O", ["'", "\""]],
+  4: ["Z", "X", "C", "V", "B", "K", "M"].concat(COLEMAK_PUNCTUATION)
+});
+const WORKMAN = remappedLayout("workman", "Workman", "Workman on a full-size ANSI keyboard", {
+  2: ["Q", "D", "R", "W", "B", "J", "F", "U", "P", [";", ":"], ["[", "{"], ["]", "}"], ["\\", "|"]],
+  3: ["A", "S", "H", "T", "G", "Y", "N", "E", "O", "I", ["'", "\""]],
+  4: ["Z", "X", "M", "C", "V", "K", "L"].concat(COLEMAK_PUNCTUATION)
+});
 
 const BUILT_INS = [QWERTY, QWERTZ, AZERTY, DVORAK, COLEMAK, WORKMAN];
 
@@ -150,6 +207,9 @@ function normalizePositionedLayer(value, index) {
   if (keys.some(candidate => candidate === null)) return null;
   const bounds = normalizeBounds(value.bounds);
   if (!bounds) return null;
+  // A key outside the declared box would be drawn over the rest of the overlay.
+  const slack = 0.001;
+  if (keys.some(item => item.x + item.width > bounds.width + slack || item.y + item.height > bounds.height + slack)) return null;
   const layerThumbKeys = normalizeThumbKeys(value.layerThumbKeys, keys.length);
   if (layerThumbKeys === null) return null;
   return {

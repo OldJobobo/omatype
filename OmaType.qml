@@ -173,6 +173,12 @@ Item {
 
     onSelectedKeyboardLayoutChanged: root.keyboardLayerIndex = 0
 
+    // Layout and layer shortcuts act only while the guide is on screen, so a
+    // hidden guide can never capture keys or change the saved layouts.
+    readonly property bool keyboardGuideActive: root.userSettings.appearance.keyboardGuide && !root.result && !root.settingsOpen && !root.languagePanelOpen && !root.progressOpen
+    readonly property bool keyboardLayoutPickerVisible: root.keyboardLayoutPickerOpen && root.keyboardGuideActive && root.availableKeyboardLayouts.length > 0
+    onKeyboardGuideActiveChanged: if (!root.keyboardGuideActive) root.keyboardLayoutPickerOpen = false
+
     function isPrintable(text) {
         if (typeof text !== "string" || Array.from(text).length !== 1) return false
         var codePoint = text.codePointAt(0)
@@ -663,6 +669,10 @@ Item {
     }
 
     function toggleKeyboardLayoutPicker() {
+        if (!root.keyboardGuideActive || root.availableKeyboardLayouts.length === 0) {
+            root.keyboardLayoutPickerOpen = false
+            return
+        }
         root.keyboardLayoutPickerOpen = !root.keyboardLayoutPickerOpen
         if (root.keyboardLayoutPickerOpen) {
             root.keyboardLayoutPickerIndex = 0
@@ -1349,7 +1359,7 @@ Item {
                     event.accepted = true
                     return
                 }
-                if (root.keyboardLayoutPickerOpen && !root.settingsOpen && !root.languagePanelOpen && !root.progressOpen) {
+                if (root.keyboardLayoutPickerVisible) {
                     if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_A) root.keyboardLayoutPickerOpen = false
                     else if (event.key === Qt.Key_Escape) root.keyboardLayoutPickerOpen = false
                     else if (event.key === Qt.Key_Left) root.moveKeyboardLayoutPicker(-1)
@@ -1401,32 +1411,32 @@ Item {
                     event.accepted = true
                     return
                 }
-                if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Left) {
+                if (root.keyboardGuideActive && controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Left) {
                     root.cycleKeyboardLayer(-1)
                     event.accepted = true
                     return
                 }
-                if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Right) {
+                if (root.keyboardGuideActive && controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Right) {
                     root.cycleKeyboardLayer(1)
                     event.accepted = true
                     return
                 }
-                if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Up) {
+                if (root.keyboardGuideActive && controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Up) {
                     root.cycleKeyboardLayout(-1)
                     event.accepted = true
                     return
                 }
-                if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Down) {
+                if (root.keyboardGuideActive && controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_Down) {
                     root.cycleKeyboardLayout(1)
                     event.accepted = true
                     return
                 }
-                if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_A) {
+                if (root.keyboardGuideActive && controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_A) {
                     root.toggleKeyboardLayoutPicker()
                     event.accepted = true
                     return
                 }
-                if (controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_D) {
+                if (root.keyboardGuideActive && controlHeld && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_D) {
                     root.removeActiveKeyboardLayout()
                     event.accepted = true
                     return
@@ -2054,7 +2064,7 @@ Item {
                     width: Math.min(parent.width, 1377)
                     readonly property real footerInset: (root.focusMode && root.runtimeSettings.appearance.focusHideFooter) ? 72 : 132
                     height: Math.max(0, Math.min(329, surface.height - y - footerInset))
-                    visible: root.userSettings.appearance.keyboardGuide && !root.result && !root.settingsOpen && !root.languagePanelOpen && !root.progressOpen
+                    visible: root.keyboardGuideActive
 
                     Row {
                         id: keyboardLayoutSelector
@@ -2062,6 +2072,8 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         height: 24
                         spacing: 16
+                        // The picker takes this row's place while it is open.
+                        visible: !root.keyboardLayoutPickerVisible
                         Repeater {
                             model: root.addedKeyboardLayouts
                             delegate: Text {
@@ -2120,21 +2132,26 @@ Item {
 
                     Rectangle {
                         id: keyboardLayoutPicker
-                        anchors.bottom: keyboardLayoutSelector.top
-                        anchors.bottomMargin: 6
+                        anchors.verticalCenter: keyboardLayoutSelector.verticalCenter
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: pickerRow.implicitWidth + 24
-                        height: 38
+                        height: 28
                         radius: 8
                         color: root.controlColor
                         border.width: 1
                         border.color: Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.35)
-                        visible: root.keyboardLayoutPickerOpen && root.availableKeyboardLayouts.length > 0
+                        visible: root.keyboardLayoutPickerVisible
                         z: 5
                         Row {
                             id: pickerRow
                             anchors.centerIn: parent
                             spacing: 16
+                            Text {
+                                text: "add"
+                                color: root.mutedColor
+                                font.family: root.typeface
+                                font.pixelSize: 12
+                            }
                             Repeater {
                                 model: root.availableKeyboardLayouts
                                 delegate: Text {
@@ -2156,6 +2173,21 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: root.addKeyboardLayout(pickerOption.modelData.id)
                                     }
+                                }
+                            }
+                            Text {
+                                text: "×"
+                                color: root.mutedColor
+                                font.family: root.typeface
+                                font.pixelSize: 12
+                                Accessible.role: Accessible.Button
+                                Accessible.name: "Close the add keyboard layout picker (Escape)"
+                                Accessible.onPressAction: root.keyboardLayoutPickerOpen = false
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -7
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.keyboardLayoutPickerOpen = false
                                 }
                             }
                         }

@@ -28,7 +28,7 @@ Rectangle {
     function characterModifiers() {
         var result = {shift: false, altGr: false}
         if (!root.activeLayer || root.nextCharacter === "") return result
-        if (/^[A-Z]$/.test(root.nextCharacter)) result.shift = true
+        if (root.nextCharacter !== root.nextCharacter.toLowerCase()) result.shift = true
         var keys = root.activeLayer.keys || []
         for (var index = 0; index < keys.length; index++) {
             if (keys[index].shift === root.nextCharacter) result.shift = true
@@ -129,6 +129,22 @@ Rectangle {
         readonly property real drawingWidth: unit * gridWidth
         readonly property real drawingHeight: unit * gridHeight
 
+        // Rows layers scale to the panel like positioned ones: the widest row
+        // sets the key unit and the row count sets the key height.
+        readonly property var rowList: root.activeLayer && root.activeLayer.rows ? root.activeLayer.rows : []
+        readonly property real rowSpacing: 5
+        readonly property real rowUnit: {
+            var widest = 1
+            var gaps = 0
+            for (var row = 0; row < rowList.length; row++) {
+                var units = 0
+                for (var column = 0; column < rowList[row].length; column++) units += rowList[row][column].width
+                if (units > widest) { widest = units; gaps = rowList[row].length - 1 }
+            }
+            return Math.max(0, Math.min(43, (width - gaps * rowSpacing) / widest))
+        }
+        readonly property real rowHeight: Math.max(0, Math.min(46, (height - rowSpacing * Math.max(0, rowList.length - 1)) / Math.max(1, rowList.length)))
+
         Repeater {
             model: diagram.positioned ? root.activeLayer.keys : []
             delegate: Rectangle {
@@ -156,9 +172,12 @@ Rectangle {
                     text: root.legend(parent.modelData)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    wrapMode: Text.Wrap
+                    wrapMode: Text.WordWrap
                     maximumLineCount: 3
                     elide: Text.ElideRight
+                    fontSizeMode: Text.Fit
+                    minimumPixelSize: 5
+                    lineHeight: 0.95
                     color: parent.highlighted || parent.modifierHighlight ? root.accentColor
                         : parent.layerThumb ? root.layerAccentColor : root.textColor
                     font.family: root.fontFamily
@@ -169,15 +188,15 @@ Rectangle {
 
         Column {
             anchors.fill: parent
-            spacing: 5
-            visible: !diagram.positioned && !!(root.activeLayer && root.activeLayer.rows)
+            spacing: diagram.rowSpacing
+            visible: !diagram.positioned && diagram.rowList.length > 0
             Repeater {
-                model: root.activeLayer && root.activeLayer.rows ? root.activeLayer.rows : []
+                model: diagram.positioned ? [] : diagram.rowList
                 delegate: Row {
                     required property int index
                     required property var modelData
                     anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 5
+                    spacing: diagram.rowSpacing
                     Repeater {
                         model: parent.modelData
                         delegate: Rectangle {
@@ -191,19 +210,26 @@ Rectangle {
                                 || modelData.altGr === root.nextCharacter
                                 || modelData.shiftAltGr === root.nextCharacter
                                 || (modelData.label === "Space" && root.nextCharacter === " "))
-                            width: Math.max(34, 43 * modelData.width)
-                            height: Math.max(28, (diagram.height - 20) / Math.max(1, root.activeLayer.rows.length) - 5)
+                            width: diagram.rowUnit * modelData.width
+                            height: diagram.rowHeight
                             radius: 5
                             color: highlighted || modifierHighlight ? Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.24) : root.backgroundColor
                             border.width: highlighted || modifierHighlight ? 2 : 1
                             border.color: highlighted || modifierHighlight ? root.accentColor : Qt.rgba(root.mutedColor.r, root.mutedColor.g, root.mutedColor.b, 0.45)
                             Text {
-                                anchors.centerIn: parent
+                                anchors.fill: parent
+                                anchors.margins: 2
                                 text: root.legend(parent.modelData)
                                 horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 3
+                                elide: Text.ElideRight
+                                fontSizeMode: Text.Fit
+                                minimumPixelSize: 5
                                 color: parent.highlighted || parent.modifierHighlight ? root.accentColor : root.textColor
                                 font.family: root.fontFamily
-                                font.pixelSize: Math.min(13, parent.height * 0.33)
+                                font.pixelSize: Math.max(7, Math.min(13, parent.height * 0.33))
                             }
                         }
                     }

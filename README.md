@@ -91,8 +91,9 @@ Programming vocabularies preserve syntax tokens as written, so punctuation and n
 ## Keyboard layouts and layers
 
 - **Default:** full-size US QWERTY, with the guide hidden until you press `Ctrl+K`.
-- **Presets:** US QWERTY, German QWERTZ, AZERTY, Dvorak, Colemak, and Workman.
-- **Add:** click the rightmost `+` above the keyboard, or press `Ctrl+Shift+A`, choose with `Left` / `Right`, and press `Enter`.
+- **Presets:** US QWERTY, German QWERTZ, French AZERTY, Dvorak, Colemak, and Workman, each with its own punctuation and shift legends.
+- **Add:** click the rightmost `+` above the keyboard, or press `Ctrl+Shift+A`, choose with `Left` / `Right`, and press `Enter`. The picker replaces the layout row until you choose or press `Escape`.
+- **Shortcuts:** the layout and layer shortcuts work while the guide is showing; with the guide hidden they do nothing.
 - **Select:** left-click a layout name or press `Ctrl+Shift+Up` / `Ctrl+Shift+Down`.
 - **Remove:** right-click a layout name or press `Ctrl+Shift+D`; the final layout is protected.
 - **Persistence:** added layouts and the active layout are saved locally.
@@ -107,7 +108,7 @@ To add your own keyboard, copy an example to `~/.config/omarchy/omatype-keyboard
 - [`examples/omatype-keyboard.json`](examples/omatype-keyboard.json) is the full **Engrammer Remnant** split layout (seven positioned layers with thumb keys), shipped as a file instead of a built-in preset.
 - [`examples/omatype-keyboard-simple.json`](examples/omatype-keyboard-simple.json) is a small rows-based starter.
 
-OmaType watches that file and adds its declared name to the layout selector after validation. The version-1 format accepts one to twelve layers. A layer uses either `rows` of key labels or positioned `keys` with `x`, `y`, `width`, and `height` plus a `bounds` box; positioned layers may also list index-based `layerThumbKeys`. A key can be a plain string or an object with `label`, optional `shift`, `altGr`, `shiftAltGr`, and `width` fields. Labels and collection sizes are bounded; file paths, QML, JavaScript, commands, and image sources are not accepted. The file is read as data and never executed.
+OmaType watches that file and adds its declared name to the layout selector after validation. The version-1 format accepts one to twelve layers. A layer uses either `rows` of key labels or positioned `keys` with `x`, `y`, `width`, and `height` plus a `bounds` box that every key must fit inside; positioned layers may also list index-based `layerThumbKeys`. A key can be a plain string or an object with `label`, optional `shift`, `altGr`, `shiftAltGr`, and `width` fields. Labels and collection sizes are bounded; file paths, QML, JavaScript, commands, and image sources are not accepted. The file is read as data and never executed.
 
 ## Local by design
 
