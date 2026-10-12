@@ -23,6 +23,8 @@ Item {
 
     property var shell: null
     property var manifest: null
+    // The host injects the manifest; cloned plugins carry a different id.
+    readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "jobo.omatype"
     property bool opened: false
     property string mode: "time"
     property int amount: 30
@@ -506,7 +508,7 @@ Item {
     }
 
     function dismiss() {
-        if (shell && typeof shell.hide === "function") shell.hide("jobo.omatype")
+        if (shell && typeof shell.hide === "function") shell.hide(root.pluginId)
         else close()
     }
 

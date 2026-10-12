@@ -9,6 +9,10 @@ Item {
     id: root
 
     property var bar: null
+    // Injected by the bar host per the widget contract; the literal is only a
+    // fallback. Cloned plugins toggle their own id instead of the original.
+    property string moduleName: "jobo.omatype"
+    readonly property string pluginId: /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(root.moduleName) ? root.moduleName : "jobo.omatype"
     property bool historyReady: false
     property bool historyAvailable: false
     property string historyError: ""
@@ -24,8 +28,17 @@ Item {
     function launchPayload() {
         var window = button.QsWindow.window
         var screenName = window && window.screen ? String(window.screen.name || "") : ""
-        if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(screenName)) return "'{}'"
-        return "'{\"screen\":\"" + screenName + "\"}'"
+        if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(screenName)) return "{}"
+        return "{\"screen\":\"" + screenName + "\"}"
+    }
+
+    // Prefer the bar's shell facade, which toggles in-process without a login
+    // shell. Fall back to the omarchy-shell CLI on hosts without the facade.
+    function toggleOverlay() {
+        var payload = root.launchPayload()
+        var api = root.bar ? root.bar.shell : null
+        if (api && typeof api.toggle === "function" && api.toggle(root.pluginId, payload) === true) return
+        if (root.bar) root.bar.run("omarchy-shell shell toggle " + root.pluginId + " '" + payload + "'")
     }
 
     function finishHistoryRead(text, exists, error) {
@@ -73,8 +86,7 @@ Item {
         tooltipText: !root.historyReady ? "OmaType • loading history…" : root.historyError !== "" ? "OmaType • history unavailable" : root.lastWpm > 0 ? "OmaType • " + Math.round(root.lastWpm) + " wpm" : "OmaType"
         slotSize: Style.bar.iconSlot
         onPressed: function(mouseButton) {
-            if (mouseButton === Qt.LeftButton && root.bar)
-                root.bar.run("omarchy-shell shell toggle jobo.omatype " + root.launchPayload())
+            if (mouseButton === Qt.LeftButton) root.toggleOverlay()
         }
     }
 }

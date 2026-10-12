@@ -158,7 +158,7 @@ QML runtime validation requires Qt 6, Quickshell, and the Quattro plugin host. C
 | `data/words-en.json` | Curated 500-word English corpus |
 | `tests/` | Dependency-free Node tests and QML contract checks |
 
-The overlay owns a full-screen `PanelWindow` and exclusive typing focus. Quattro keeps the plugin instance alive and calls `open(payloadJson)` and `close()`. The bar widget follows the supported `BarIconButton` contract and uses `bar.run(...)` to toggle `jobo.omatype` through `omarchy-shell`.
+The overlay owns a full-screen `PanelWindow` and exclusive typing focus. Quattro keeps the plugin instance alive and calls `open(payloadJson)` and `close()`. The bar widget follows the supported `BarIconButton` contract and toggles its own plugin id through the bar's shell facade (`bar.shell.toggle(...)`), falling back to `bar.run(...)` with `omarchy-shell shell toggle` on hosts without the facade. Both entry points read their id from what the host injects, so a cloned plugin toggles and hides itself rather than the original.
 
 </details>
 
