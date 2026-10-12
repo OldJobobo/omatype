@@ -1,0 +1,2982 @@
+{
+  "schemaVersion": 1,
+  "name": "Engrammer Remnant",
+  "description": "Engrammer on the split 5x6+5 Remnant, with Miryoku layers",
+  "layers": [
+    {
+      "id": "base",
+      "name": "Base",
+      "bounds": {
+        "width": 17,
+        "height": 5.45
+      },
+      "layerThumbKeys": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55
+      ],
+      "keys": [
+        {
+          "label": "`",
+          "x": 0,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "~"
+        },
+        {
+          "label": "1",
+          "x": 1,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "!"
+        },
+        {
+          "label": "2",
+          "x": 2,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "@"
+        },
+        {
+          "label": "3",
+          "x": 3,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "#"
+        },
+        {
+          "label": "4",
+          "x": 4,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "$"
+        },
+        {
+          "label": "5",
+          "x": 5,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "%"
+        },
+        {
+          "label": "6",
+          "x": 11,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "^"
+        },
+        {
+          "label": "7",
+          "x": 12,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "&"
+        },
+        {
+          "label": "8",
+          "x": 13,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "*"
+        },
+        {
+          "label": "9",
+          "x": 14,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "("
+        },
+        {
+          "label": "0",
+          "x": 15,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": ")"
+        },
+        {
+          "label": "=",
+          "x": 16,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "+"
+        },
+        {
+          "label": "\\",
+          "x": 0,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "|"
+        },
+        {
+          "label": "B",
+          "x": 1,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Y",
+          "x": 2,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "O",
+          "x": 3,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "U",
+          "x": 4,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "'",
+          "x": 5,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "\""
+        },
+        {
+          "label": ";",
+          "x": 11,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": ":"
+        },
+        {
+          "label": "L",
+          "x": 12,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "D",
+          "x": 13,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "W",
+          "x": 14,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "V",
+          "x": 15,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Z",
+          "x": 16,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Caps word",
+          "x": 0,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "C",
+          "x": 1,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Win"
+        },
+        {
+          "label": "I",
+          "x": 2,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Alt"
+        },
+        {
+          "label": "E",
+          "x": 3,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Ctrl"
+        },
+        {
+          "label": "A",
+          "x": 4,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Shift"
+        },
+        {
+          "label": ",",
+          "x": 5,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "<"
+        },
+        {
+          "label": ".",
+          "x": 11,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": ">"
+        },
+        {
+          "label": "H",
+          "x": 12,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Shift"
+        },
+        {
+          "label": "T",
+          "x": 13,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Ctrl"
+        },
+        {
+          "label": "S",
+          "x": 14,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Alt"
+        },
+        {
+          "label": "N",
+          "x": 15,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Win"
+        },
+        {
+          "label": "Q",
+          "x": 16,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Shift",
+          "x": 0,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "G",
+          "x": 1,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "X",
+          "x": 2,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "AltGr"
+        },
+        {
+          "label": "J",
+          "x": 3,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "K",
+          "x": 4,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "-",
+          "x": 5,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "_"
+        },
+        {
+          "label": "/",
+          "x": 11,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "?"
+        },
+        {
+          "label": "R",
+          "x": 12,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "M",
+          "x": 13,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F",
+          "x": 14,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "AltGr"
+        },
+        {
+          "label": "P",
+          "x": 15,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Shift",
+          "x": 16,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Page up",
+          "x": 2,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Page down",
+          "x": 3,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Backspace",
+          "x": 5,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Cursor"
+        },
+        {
+          "label": "Delete",
+          "x": 6,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Number"
+        },
+        {
+          "label": "Escape",
+          "x": 7,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Function"
+        },
+        {
+          "label": "Enter",
+          "x": 9,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "System"
+        },
+        {
+          "label": "Tab",
+          "x": 10,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Mouse"
+        },
+        {
+          "label": "Space",
+          "x": 11,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "Symbol"
+        },
+        {
+          "label": "[",
+          "x": 13,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "{"
+        },
+        {
+          "label": "]",
+          "x": 14,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88,
+          "shift": "}"
+        }
+      ]
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "bounds": {
+        "width": 17,
+        "height": 5.45
+      },
+      "layerThumbKeys": [
+        50
+      ],
+      "keys": [
+        {
+          "label": "Reset",
+          "x": 0,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "EEPROM reset",
+          "x": 5,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Redo",
+          "x": 13,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Undo",
+          "x": 14,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 16,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 0,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Cut",
+          "x": 11,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Backspace",
+          "x": 12,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Undo",
+          "x": 13,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Redo",
+          "x": 14,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Delete",
+          "x": 15,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Insert",
+          "x": 16,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Caps lock",
+          "x": 0,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Win",
+          "x": 1,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Alt",
+          "x": 2,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Ctrl",
+          "x": 3,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Shift",
+          "x": 4,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Copy",
+          "x": 11,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Left",
+          "x": 12,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Up",
+          "x": 13,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Down",
+          "x": 14,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Right",
+          "x": 15,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Print screen",
+          "x": 16,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sticky layer",
+          "x": 0,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "AltGr",
+          "x": 2,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Debug",
+          "x": 5,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Paste",
+          "x": 11,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Home",
+          "x": 12,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Page up",
+          "x": 13,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Page down",
+          "x": 14,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "End",
+          "x": 15,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Find & replace",
+          "x": 16,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Cursor",
+          "x": 5,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 6,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 7,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Select URL",
+          "x": 9,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Select all",
+          "x": 10,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Select word",
+          "x": 11,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Find",
+          "x": 13,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Find next",
+          "x": 14,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        }
+      ]
+    },
+    {
+      "id": "number",
+      "name": "Number",
+      "bounds": {
+        "width": 17,
+        "height": 5.45
+      },
+      "layerThumbKeys": [
+        51
+      ],
+      "keys": [
+        {
+          "label": "Reset",
+          "x": 0,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "EEPROM reset",
+          "x": 5,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "~",
+          "x": 11,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "^",
+          "x": 12,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "#",
+          "x": 13,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "$",
+          "x": 14,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "@",
+          "x": 15,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "!",
+          "x": 16,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 0,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "%",
+          "x": 11,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "7",
+          "x": 12,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "8",
+          "x": 13,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "9",
+          "x": 14,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ":",
+          "x": 15,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "<",
+          "x": 16,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Num lock",
+          "x": 0,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Win",
+          "x": 1,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Alt",
+          "x": 2,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Ctrl",
+          "x": 3,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Shift",
+          "x": 4,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "+",
+          "x": 11,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "4",
+          "x": 12,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "5",
+          "x": 13,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "6",
+          "x": 14,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "-",
+          "x": 15,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ">",
+          "x": 16,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sticky layer",
+          "x": 0,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Debug",
+          "x": 5,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "*",
+          "x": 11,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "1",
+          "x": 12,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "2",
+          "x": 13,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "3",
+          "x": 14,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "/",
+          "x": 15,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "=",
+          "x": 16,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Number",
+          "x": 6,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 7,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ",",
+          "x": 9,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ".",
+          "x": 10,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "0",
+          "x": 11,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "(",
+          "x": 13,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ")",
+          "x": 14,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        }
+      ]
+    },
+    {
+      "id": "function",
+      "name": "Function",
+      "bounds": {
+        "width": 17,
+        "height": 5.45
+      },
+      "layerThumbKeys": [
+        52
+      ],
+      "keys": [
+        {
+          "label": "Reset",
+          "x": 0,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "EEPROM reset",
+          "x": 5,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Media",
+          "x": 11,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Play",
+          "x": 12,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Previous",
+          "x": 13,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Next",
+          "x": 14,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Stop",
+          "x": 15,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Eject",
+          "x": 16,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 0,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Wheel home",
+          "x": 11,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F7",
+          "x": 12,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F8",
+          "x": 13,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F9",
+          "x": 14,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F10",
+          "x": 15,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F13",
+          "x": 16,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Scroll lock",
+          "x": 0,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Win",
+          "x": 1,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Alt",
+          "x": 2,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Ctrl",
+          "x": 3,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Shift",
+          "x": 4,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Calculator",
+          "x": 11,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F4",
+          "x": 12,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F5",
+          "x": 13,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F6",
+          "x": 14,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F11",
+          "x": 15,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F14",
+          "x": 16,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sticky layer",
+          "x": 0,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Debug",
+          "x": 5,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Computer",
+          "x": 11,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F1",
+          "x": 12,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F2",
+          "x": 13,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F3",
+          "x": 14,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F12",
+          "x": 15,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "F15",
+          "x": 16,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 6,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Function",
+          "x": 7,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Mute",
+          "x": 9,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Volume -",
+          "x": 10,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Volume +",
+          "x": 11,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Bright -",
+          "x": 13,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Bright +",
+          "x": 14,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        }
+      ]
+    },
+    {
+      "id": "symbol",
+      "name": "Symbol",
+      "bounds": {
+        "width": 17,
+        "height": 5.45
+      },
+      "layerThumbKeys": [
+        55
+      ],
+      "keys": [
+        {
+          "label": "~",
+          "x": 0,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ",",
+          "x": 1,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "(",
+          "x": 2,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ")",
+          "x": 3,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ";",
+          "x": 4,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "?",
+          "x": 5,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "EEPROM reset",
+          "x": 11,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Reset",
+          "x": 16,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "@",
+          "x": 0,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "{",
+          "x": 1,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "\"",
+          "x": 2,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "'",
+          "x": 3,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "}",
+          "x": 4,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ".",
+          "x": 5,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 16,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "#",
+          "x": 0,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "^",
+          "x": 1,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "=",
+          "x": 2,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "_",
+          "x": 3,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "$",
+          "x": 4,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "*",
+          "x": 5,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Shift",
+          "x": 12,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Ctrl",
+          "x": 13,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Alt",
+          "x": 14,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Win",
+          "x": 15,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 16,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "!",
+          "x": 0,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "<",
+          "x": 1,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "|",
+          "x": 2,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "-",
+          "x": 3,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ">",
+          "x": 4,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "/",
+          "x": 5,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Debug",
+          "x": 11,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sticky layer",
+          "x": 16,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "&",
+          "x": 2,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "+",
+          "x": 3,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "\\",
+          "x": 5,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": ":",
+          "x": 6,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "%",
+          "x": 7,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 9,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 10,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Symbol",
+          "x": 11,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "[",
+          "x": 13,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "]",
+          "x": 14,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        }
+      ]
+    },
+    {
+      "id": "mouse",
+      "name": "Mouse",
+      "bounds": {
+        "width": 17,
+        "height": 5.45
+      },
+      "layerThumbKeys": [
+        54
+      ],
+      "keys": [
+        {
+          "label": "",
+          "x": 0,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "EEPROM reset",
+          "x": 11,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Reset",
+          "x": 16,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 0,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Accel 2",
+          "x": 1,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Wheel left",
+          "x": 2,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Mouse up",
+          "x": 3,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Wheel right",
+          "x": 4,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 16,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 0,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Accel 0",
+          "x": 1,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Mouse left",
+          "x": 2,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Mouse down",
+          "x": 3,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Mouse right",
+          "x": 4,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Shift",
+          "x": 12,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Ctrl",
+          "x": 13,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Alt",
+          "x": 14,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Win",
+          "x": 15,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 16,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 0,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Accel 1",
+          "x": 1,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Ctrl",
+          "x": 2,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Button 4",
+          "x": 3,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Button 5",
+          "x": 4,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Debug",
+          "x": 11,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sticky layer",
+          "x": 16,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Wheel up",
+          "x": 2,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Wheel down",
+          "x": 3,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Button 1",
+          "x": 5,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Button 2",
+          "x": 6,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Button 3",
+          "x": 7,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 9,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Mouse",
+          "x": 10,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        }
+      ]
+    },
+    {
+      "id": "system",
+      "name": "System",
+      "bounds": {
+        "width": 17,
+        "height": 5.45
+      },
+      "layerThumbKeys": [
+        53
+      ],
+      "keys": [
+        {
+          "label": "Power",
+          "x": 0,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 4,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 5,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "EEPROM reset",
+          "x": 11,
+          "y": 0.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 0.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 0,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 0.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 0.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Reset",
+          "x": 16,
+          "y": 0.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB X",
+          "x": 0,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 1,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 2,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 3,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB twinkle",
+          "x": 4,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB rainbow",
+          "x": 5,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 1.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 1.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 1.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 1.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 16,
+          "y": 1.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB knight",
+          "x": 0,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB -",
+          "x": 1,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB mode -",
+          "x": 2,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB mode +",
+          "x": 3,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB +",
+          "x": 4,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB gradient",
+          "x": 5,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 2.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Shift",
+          "x": 12,
+          "y": 2.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Ctrl",
+          "x": 13,
+          "y": 2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Alt",
+          "x": 14,
+          "y": 2.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Win",
+          "x": 15,
+          "y": 2.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 16,
+          "y": 2.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB plain",
+          "x": 0,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sat -",
+          "x": 1,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Hue -",
+          "x": 2,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Hue +",
+          "x": 3,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sat +",
+          "x": 4,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB breathe",
+          "x": 5,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Debug",
+          "x": 11,
+          "y": 3.22,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 12,
+          "y": 3.09,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 3.06,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 15,
+          "y": 3.18,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sticky layer",
+          "x": 16,
+          "y": 3.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Wake",
+          "x": 2,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Sleep",
+          "x": 3,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Screenshot",
+          "x": 5,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "Pause",
+          "x": 6,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "RGB toggle",
+          "x": 7,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "System",
+          "x": 9,
+          "y": 4.3,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 10,
+          "y": 4.2,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 11,
+          "y": 4.1,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 13,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        },
+        {
+          "label": "",
+          "x": 14,
+          "y": 4.16,
+          "width": 0.9,
+          "height": 0.88
+        }
+      ]
+    }
+  ]
+}

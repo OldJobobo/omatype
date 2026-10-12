@@ -7,6 +7,7 @@ All notable changes to OmaType are documented here.
 ### Added
 
 - The overlay header shows the running version next to the title, read from the manifest the host loaded.
+- A keyboard guide with six built-in presets, next-character highlighting, keyboard-accessible layout and layer navigation, and a bounded declarative custom layout file that also ships the Engrammer Remnant layout as an optional example. It is off until `Ctrl+K` or the settings row turns it on.
 
 ## [0.2.2] - 2026-10-11
 

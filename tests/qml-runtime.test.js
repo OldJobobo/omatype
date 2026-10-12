@@ -87,3 +87,27 @@ test("SecureFile runtime covers CAS queues, external replacements, and future-sc
   assert.equal(warnings.filter(line => expectedStartFailure.test(line)).length, 2, output);
   assert.deepEqual(warnings.filter(line => !expectedStartFailure.test(line)), [], output);
 });
+
+test("KeyboardGuide runtime covers positioned keys, numpad disambiguation, and rows fallback", {timeout: 10000}, t => {
+  if (!available("qs") || !process.env.WAYLAND_DISPLAY) return t.skip("Quickshell Wayland runtime unavailable");
+  const fixture = path.join(__dirname, "fixtures", "KeyboardGuideRuntime.qml");
+  const harness = path.join(__dirname, "..", ".omatype-keyboard-runtime.qml");
+  fs.copyFileSync(fixture, harness);
+  let result;
+  try {
+    result = spawnSync("qs", ["-p", harness, "--no-color"], {
+      encoding: "utf8",
+      timeout: 8000,
+      env: Object.assign({}, process.env, RUNTIME_ENV)
+    });
+  } finally {
+    fs.rmSync(harness, {force: true});
+  }
+  const output = String(result.stdout || "") + String(result.stderr || "");
+  assert.equal(result.error, undefined, output);
+  assert.equal(result.status, 0, output);
+  assert.match(output, /GUIDE_HARNESS_OK: positioned keys, numpad disambiguation, rows fallback, layer tabs, and thumb highlighting/);
+  assert.doesNotMatch(output, /GUIDE_HARNESS_FAILURE|\bERROR\b|TypeError|ReferenceError/);
+  const warnings = output.split("\n").filter(line => /\bWARN\b/.test(line));
+  assert.deepEqual(warnings, [], output);
+});
