@@ -25,6 +25,8 @@ Item {
     property var manifest: null
     // The host injects the manifest; cloned plugins carry a different id.
     readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "jobo.omatype"
+    // Whatever the host loaded, so the header shows the version actually running.
+    readonly property string pluginVersion: manifest && manifest.version ? String(manifest.version) : ""
     property bool opened: false
     property string mode: "time"
     property int amount: 30
@@ -1348,6 +1350,7 @@ Item {
                         font.pixelSize: 31
                     }
                     Text {
+                        id: logoTitle
                         anchors.left: logoIcon.right
                         anchors.leftMargin: 9
                         anchors.verticalCenter: parent.verticalCenter
@@ -1356,6 +1359,16 @@ Item {
                         font.family: root.typeface
                         font.pixelSize: 30
                         font.weight: Font.DemiBold
+                    }
+                    Text {
+                        anchors.left: logoTitle.right
+                        anchors.leftMargin: 10
+                        anchors.baseline: logoTitle.baseline
+                        visible: root.pluginVersion.length > 0
+                        text: "ver. " + root.pluginVersion
+                        color: root.mutedColor
+                        font.family: root.typeface
+                        font.pixelSize: 13
                     }
                 }
 

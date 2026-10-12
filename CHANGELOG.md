@@ -4,6 +4,10 @@ All notable changes to OmaType are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- The overlay header shows the running version next to the title, read from the manifest the host loaded.
+
 ## [0.2.2] - 2026-10-11
 
 ### Fixed
