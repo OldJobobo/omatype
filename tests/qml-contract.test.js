@@ -112,6 +112,16 @@ test("header uses the OmaType product name and omits redundant offline status", 
   assert.doesNotMatch(q, /text:\s*"offline"/);
 });
 
+test("header reads the running version from the host manifest instead of a literal", () => {
+  const q = read("OmaType.qml");
+  includesAll(q, [
+    "readonly property string pluginVersion: manifest && manifest.version ? String(manifest.version) : \"\"",
+    "visible: root.pluginVersion.length > 0",
+    "text: \"ver. \" + root.pluginVersion"
+  ]);
+  assert.doesNotMatch(q, /text:\s*"ver\. \d/);
+});
+
 test("overlay keeps epoch time at double precision and publishes one complete result object", () => {
   const q = read("OmaType.qml");
   includesAll(q, ["property double nowMs", "var summary = Metrics.summarize", "result = summary", "summary.characters", "summary.correct"]);

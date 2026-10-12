@@ -17,7 +17,6 @@ Do not ask users to repeat those setup steps in their prompts.
 ## Environment and verification
 
 - On Neuromancer/NixOS, use the task's pinned `shell.nix`: `nix-shell --run 'tests/run'`. No global package installs or host changes.
-- Until this setup lands on main, use `nix-shell ~/Projects/omatype-worktrees/neuromancer-pilot/shell.nix --run 'tests/run'` from the task worktree. Do not edit the pilot for unrelated tasks.
 - The shell supplies Node and Python and sets `OMATYPE_TEST_PYTHON` for secure-helper tests. Do not change the application's `/usr/bin/python3` Omarchy contract merely to accommodate the development host.
 - Run the complete `tests/run` suite, JSON validation documented in README, and `git diff --check` before reporting readiness. Report skips explicitly; headless success is not graphical acceptance.
 - Run real Quickshell/Wayland and plugin-host validation on Wintermute for QML or UI changes. Request approval before changing the installed plugin, restarting its shell, or touching real user history/preferences. Use isolated fixtures where possible.
