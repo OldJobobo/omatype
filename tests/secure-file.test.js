@@ -322,3 +322,56 @@ test("helper rejects paths, caps, and malformed expected revisions outside its a
   assert.equal(run(f.home, "write", f.history, 16777217, frame("{}" )).status, 4);
   assert.equal(run(f.home, "write", f.settings, 262144, frame("{}"), "not-a-revision").status, 2);
 });
+
+test("stale temporaries from an interrupted write are swept while fresh ones and symlinks stay", t => {
+  const f = fixture(); t.after(f.cleanup);
+  assert.equal(run(f.home, "write", f.settings, 262144, frame("{}")).status, 0);
+  const dir = path.dirname(f.settings);
+  const temp = suffix => path.join(dir, `.${path.basename(f.settings)}.tmp-${suffix}`);
+  const stale = temp("a".repeat(24));
+  const fresh = temp("b".repeat(24));
+  const linked = temp("c".repeat(24));
+  const foreign = path.join(dir, `.${path.basename(f.settings)}.tmp-short`);
+  fs.writeFileSync(stale, "stale"); fs.writeFileSync(fresh, "fresh"); fs.writeFileSync(foreign, "foreign");
+  fs.symlinkSync(f.settings, linked);
+  const old = new Date(Date.now() - 3600 * 1000);
+  fs.utimesSync(stale, old, old); fs.utimesSync(foreign, old, old); fs.lutimesSync(linked, old, old);
+  const written = run(f.home, "write", f.settings, 262144, frame('{"next":true}'));
+  assert.equal(written.status, 0, String(written.stderr));
+  assert.equal(fs.existsSync(stale), false);
+  assert.equal(fs.readFileSync(fresh, "utf8"), "fresh");
+  assert.equal(fs.readFileSync(foreign, "utf8"), "foreign");
+  assert.equal(fs.lstatSync(linked).isSymbolicLink(), true);
+  assert.equal(fs.readFileSync(f.settings, "utf8"), '{"next":true}');
+});
+
+test("a symlinked HOME is resolved once and both spellings of the target are accepted", t => {
+  const f = fixture(); t.after(f.cleanup);
+  const realHome = path.join(f.home, "real");
+  const linkHome = path.join(f.home, "link");
+  fs.mkdirSync(realHome, 0o700);
+  fs.symlinkSync(realHome, linkHome);
+  const nominal = path.join(linkHome, ".config", "omarchy", "omatype-settings.json");
+  const resolved = path.join(realHome, ".config", "omarchy", "omatype-settings.json");
+  const written = run(linkHome, "write", nominal, 262144, frame('{"home":"link"}'));
+  assert.equal(written.status, 0, String(written.stderr));
+  assert.equal(fs.readFileSync(resolved, "utf8"), '{"home":"link"}');
+  const read = run(linkHome, "read", nominal, 262144);
+  assert.equal(read.status, 0, String(read.stderr));
+  assert.equal(String(read.stdout), '{"home":"link"}');
+  const direct = run(linkHome, "read", resolved, 262144);
+  assert.equal(direct.status, 0, String(direct.stderr));
+  const outside = run(linkHome, "read", path.join(f.home, ".config", "omarchy", "omatype-settings.json"), 262144);
+  assert.equal(outside.status, 4);
+});
+
+test("directory boundary errors name the offending component", t => {
+  const f = fixture(); t.after(f.cleanup);
+  const config = path.join(f.home, ".config");
+  fs.mkdirSync(config);
+  fs.chmodSync(config, 0o775);
+  const written = run(f.home, "write", f.settings, 262144, frame("{}"));
+  assert.equal(written.status, 4);
+  assert.match(String(written.stderr), /~\/\.config is not a private owned directory/);
+  assert.equal(fs.existsSync(f.settings), false);
+});
