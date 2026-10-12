@@ -41,4 +41,5 @@ commit per step, full gates before the PR.
 
 ## Status
 
-Updated as steps land; see the commit history on the branch.
+- Steps 1-7 and 9 landed on `agent/review-fixes` (one commit each; steps 3 and 4 share a commit). Headless suite 155/0/3 skipped; Wintermute runtime tests 3/3 green including the missing-interpreter fixture; `omarchy plugin validate` passes.
+- Step 8 (reinstall the Wintermute copy as a git checkout, then graphical acceptance) is waiting for owner approval because it changes the installed plugin.
