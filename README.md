@@ -125,7 +125,17 @@ omarchy-restart-shell
 
 ### Validate changes
 
-Node.js 20 or newer is required for the development test suite. There are no npm dependencies.
+Node.js 20 or newer and Python 3 are required for the development test suite. There are no npm dependencies; Python uses only its standard library.
+
+For headless NixOS development, the pinned shell supplies both interpreters without requiring experimental Nix features:
+
+```sh
+nix-shell --run 'tests/run'
+```
+
+The shell sets `OMATYPE_TEST_PYTHON` for secure-helper tests. Outside Nix, these tests retain the default `/usr/bin/python3`; an explicit interpreter override is available through that environment variable. This does not change the installed Omarchy plugin's system-Python requirement.
+
+Agents must follow [AGENTS.md](AGENTS.md): isolated task worktrees, agent-owned environment setup, and graphical validation on the target Omarchy host.
 
 ```sh
 tests/run

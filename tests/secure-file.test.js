@@ -8,10 +8,13 @@ const {spawn, spawnSync} = require("node:child_process");
 
 const root = path.join(__dirname, "..");
 const helper = path.join(root, "scripts", "secure_file.py");
-const python = "/usr/bin/python3";
+// The application retains its Omarchy system-interpreter contract. Headless
+// development may use a pinned interpreter without that filesystem layout.
+const python = process.env.OMATYPE_TEST_PYTHON || "/usr/bin/python3";
 
 function fixture() {
-  const home = fs.mkdtempSync(path.join(__dirname, ".secure-file-"));
+  // Unix-domain socket paths are length-limited; worktree paths can be long.
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "omatype-secure-"));
   return {
     home,
     settings: path.join(home, ".config", "omarchy", "omatype-settings.json"),
