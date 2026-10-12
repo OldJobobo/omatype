@@ -5,6 +5,16 @@ const {spawnSync} = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
 
+// Qt platform plugins log noise that is unrelated to OmaType: the Wayland
+// text-input module warns while a surface loses focus during teardown, and a
+// non-UTF-8 locale triggers a locale switch warning. Silence both at source so
+// the zero-warning assertions below keep catching real plugin warnings.
+const RUNTIME_ENV = {
+  QT_LOGGING_RULES: "qt.qpa.services=false;quickshell.qmlscanner=false;qt.qpa.wayland.textinput.warning=false",
+  LANG: "C.UTF-8",
+  LC_ALL: "C.UTF-8"
+};
+
 function available(command) {
   return spawnSync("bash", ["-lc", `command -v ${command}`], {encoding: "utf8"}).status === 0;
 }
@@ -15,7 +25,7 @@ test("Qt font metrics and native glyph rendering are available in Quickshell", {
   const result = spawnSync("qs", ["-p", fixture, "--no-color"], {
     encoding: "utf8",
     timeout: 8000,
-    env: Object.assign({}, process.env, {QT_LOGGING_RULES: "qt.qpa.services=false;quickshell.qmlscanner=false"})
+    env: Object.assign({}, process.env, RUNTIME_ENV)
   });
   const output = String(result.stdout || "") + String(result.stderr || "");
   assert.equal(result.error, undefined, output);
@@ -34,7 +44,7 @@ test("visible narrow ProgressView runtime covers exact filter reveal and existin
     result = spawnSync("qs", ["-p", harness, "--no-color"], {
       encoding: "utf8",
       timeout: 8000,
-      env: Object.assign({}, process.env, {QT_LOGGING_RULES: "qt.qpa.services=false;quickshell.qmlscanner=false"})
+      env: Object.assign({}, process.env, RUNTIME_ENV)
     });
   } finally {
     fs.rmSync(harness, {force: true});
@@ -59,10 +69,7 @@ test("SecureFile runtime covers CAS queues, external replacements, and future-sc
     result = spawnSync("qs", ["-p", harness, "--no-color"], {
       encoding: "utf8",
       timeout: 12000,
-      env: Object.assign({}, process.env, {
-        HOME: runtimeHome,
-        QT_LOGGING_RULES: "qt.qpa.services=false;quickshell.qmlscanner=false"
-      })
+      env: Object.assign({}, process.env, RUNTIME_ENV, {HOME: runtimeHome})
     });
   } finally {
     fs.rmSync(harness, {force: true});
