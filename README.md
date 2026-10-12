@@ -93,7 +93,7 @@ OmaType does not use the network, read credentials, request elevated privileges,
 | Typing history and compacted long-term statistics | `~/.local/state/omarchy/omatype-history.json` |
 | Optional retained-result CSV export | `~/.local/state/omarchy/omatype-history.csv` |
 
-Preferences and history are versioned and validated before use. A settings file from a newer schema is left untouched: OmaType starts with safe in-memory defaults, cancels queued writes, and refuses to overwrite it. Local reads are bounded and accept only owned regular files reached through owned, non-writable-by-group-or-others directories without following symlinks; FIFOs, sockets, directories, oversized content, invalid UTF-8, and excessive history structures are rejected.
+Preferences and history are versioned and validated before use. A settings file from a newer schema is left untouched: OmaType starts with safe in-memory defaults, cancels queued writes, and refuses to overwrite it. Local reads are bounded and accept only owned regular files reached through owned, non-writable-by-group-or-others directories without following symlinks; FIFOs, sockets, directories, oversized content, invalid UTF-8, and excessive history structures are rejected. A group-writable `~/.config` or `~/.local/state` is refused by design, and the footer names the offending directory. `HOME` itself comes from the session and is resolved once if it is a symlink; every directory below it is still opened without following symlinks. Temporaries abandoned by an interrupted write are removed on the next write.
 
 Saves use OmaType’s bundled standard-library Python helper. Revision-checked settings and history writes take an advisory directory lock, verify the exact previously read bytes, create a private `0600` temporary, sync it, recheck destination identity, and atomically publish it. Conflicting history operations are replayed onto the newly loaded document instead of retrying a stale snapshot. CSV export intentionally replaces its own destination without following a symlink and neutralizes spreadsheet-formula prefixes. A non-cooperating process running as the same user can still race after the final identity check; owner-private directories, revision checks, and atomic rename narrow that residual window but cannot provide a kernel-level compare-and-swap.
 
@@ -158,7 +158,7 @@ QML runtime validation requires Qt 6, Quickshell, and the Quattro plugin host. C
 | `data/words-en.json` | Curated 500-word English corpus |
 | `tests/` | Dependency-free Node tests and QML contract checks |
 
-The overlay owns a full-screen `PanelWindow` and exclusive typing focus. Quattro keeps the plugin instance alive and calls `open(payloadJson)` and `close()`. The bar widget follows the supported `BarIconButton` contract and uses `bar.run(...)` to toggle `jobo.omatype` through `omarchy-shell`.
+The overlay owns a full-screen `PanelWindow` and exclusive typing focus. Quattro keeps the plugin instance alive and calls `open(payloadJson)` and `close()`. The bar widget follows the supported `BarIconButton` contract and toggles its own plugin id through the bar's shell facade (`bar.shell.toggle(...)`), falling back to `bar.run(...)` with `omarchy-shell shell toggle` on hosts without the facade. Both entry points read their id from what the host injects, so a cloned plugin toggles and hides itself rather than the original.
 
 </details>
 

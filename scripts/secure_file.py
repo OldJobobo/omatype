@@ -26,6 +26,7 @@ EXIT_ENCODING = 6
 EXIT_FRAME = 7
 EXIT_CONFLICT = 8
 
+STALE_TEMP_SECONDS = 600
 SETTINGS_CAP = 262_144
 LARGE_CAP = 16_777_216
 TARGETS = {
@@ -71,24 +72,35 @@ def checked_request(argv: list[str]) -> tuple[str, str, tuple[str, ...], int, st
     home = os.environ.get("HOME", "")
     if not home or not os.path.isabs(home) or not os.path.isabs(path):
         raise BoundaryError("HOME and target path must be absolute")
-    home = os.path.normpath(home)
+    # HOME comes from the session and is trusted, so a symlinked home
+    # directory is resolved once here. Every component below it is still
+    # opened without following symlinks. The target may be spelled with
+    # either the nominal or the resolved prefix.
+    nominal_home = os.path.normpath(home)
+    real_home = os.path.realpath(nominal_home)
     path = os.path.normpath(path)
-    try:
-        relative = os.path.relpath(path, home)
-    except ValueError as error:
-        raise BoundaryError("target is outside HOME") from error
-    parts = tuple(relative.split(os.sep))
-    allowed_cap = TARGETS.get(parts)
-    if allowed_cap is None or cap <= 0 or cap > allowed_cap:
+    parts = None
+    for base in (nominal_home, real_home):
+        try:
+            candidate = tuple(os.path.relpath(path, base).split(os.sep))
+        except ValueError:
+            continue
+        if candidate in TARGETS:
+            parts = candidate
+            break
+    if parts is None:
         raise BoundaryError("target path or byte cap is not allowed")
-    return operation, home, parts, cap, expected
+    allowed_cap = TARGETS[parts]
+    if cap <= 0 or cap > allowed_cap:
+        raise BoundaryError("target path or byte cap is not allowed")
+    return operation, real_home, parts, cap, expected
 
 
-def verify_directory(fd: int) -> None:
+def verify_directory(fd: int, shown: str) -> None:
     info = os.fstat(fd)
     if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
             or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH)):
-        raise BoundaryError("path component is not a private owned directory")
+        raise BoundaryError(f"{shown} is not a private owned directory")
 
 
 def open_parent(home: str, parts: tuple[str, ...], create: bool) -> tuple[int, str]:
@@ -96,9 +108,11 @@ def open_parent(home: str, parts: tuple[str, ...], create: bool) -> tuple[int, s
         current = os.open(home, DIR_FLAGS)
     except OSError as error:
         raise BoundaryError(f"cannot open HOME safely: {error.strerror}") from error
+    shown = "~"
     try:
-        verify_directory(current)
+        verify_directory(current, shown)
         for component in parts[:-1]:
+            shown += "/" + component
             try:
                 child = os.open(component, DIR_FLAGS, dir_fd=current)
             except FileNotFoundError:
@@ -115,7 +129,7 @@ def open_parent(home: str, parts: tuple[str, ...], create: bool) -> tuple[int, s
                 raise BoundaryError(f"unsafe path component: {error.strerror}") from error
             os.close(current)
             current = child
-            verify_directory(current)
+            verify_directory(current, shown)
         return current, parts[-1]
     except Exception:
         os.close(current)
@@ -295,6 +309,31 @@ def same_parent_identity(home: str, parts: tuple[str, ...], parent: int, name: s
             os.close(current)
 
 
+def sweep_stale_temps(parent: int, name: str) -> None:
+    """Remove this target's abandoned temporaries.
+
+    A SIGKILL mid-write skips the normal cleanup. Only owned regular files that
+    match our own naming pattern and are older than STALE_TEMP_SECONDS go,
+    looked up without following symlinks. Runs under the directory lock, so a
+    concurrent cooperating writer's fresh temporary is never touched.
+    """
+    prefix = f".{name}.tmp-"
+    cutoff = time.time() - STALE_TEMP_SECONDS
+    try:
+        entries = os.listdir(parent)
+    except OSError:
+        return
+    for entry in entries:
+        if not entry.startswith(prefix) or len(entry) != len(prefix) + 24:
+            continue
+        try:
+            info = os.stat(entry, dir_fd=parent, follow_symlinks=False)
+            if owned_regular(info) and info.st_mtime < cutoff:
+                os.unlink(entry, dir_fd=parent)
+        except OSError:
+            continue
+
+
 def before_publish(_parent: int, _name: str) -> None:
     """Test seam invoked before the final descriptor/path correspondence check."""
 
@@ -308,6 +347,7 @@ def write_target(home: str, parts: tuple[str, ...], cap: int, expected: str) -> 
     current_info = None
     try:
         fcntl.flock(parent, fcntl.LOCK_EX)
+        sweep_stale_temps(parent, name)
         if expected == "any":
             try:
                 initial = os.stat(name, dir_fd=parent, follow_symlinks=False)

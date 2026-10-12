@@ -4,6 +4,20 @@ All notable changes to OmaType are documented here.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-11
+
+### Fixed
+
+- A persistence helper that cannot start (for example a missing system Python) now reports a load or save failure instead of leaving the overlay waiting forever; the footer and bar tooltip show the helper's own error text.
+- Escape and Ctrl+Escape close a cloned plugin: both entry points read their id from what the host injects instead of a hardcoded `jobo.omatype`.
+- Changing an unrelated setting no longer reverts a one-shot IPC mode, length, or language while that test is on screen; only an external edit of the settings file re-syncs the setup.
+- The Quickshell runtime tests silence unrelated Qt platform warnings so they pass on the Omarchy host.
+
+### Changed
+
+- The bar widget toggles the overlay through the bar's shell facade in-process, falling back to the `omarchy-shell` CLI, and reads only the newest run instead of normalizing the whole history document on every bar instance.
+- The persistence helper sweeps temporaries abandoned by an interrupted write, resolves a symlinked `HOME` once before its no-follow walk, and names the offending directory in boundary errors.
+
 ## [0.2.1] - 2026-10-09
 
 ### Fixed

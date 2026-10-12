@@ -12,6 +12,49 @@ ShellRoot {
     property string externalPayload: "{\"schemaVersion\":1,\"label\":\"external watcher\"}"
     property string futurePayload: "{\n  \"schemaVersion\": 99,\n  \"future\": true\n}"
     property string stalePayload: "{\"schemaVersion\":1,\"label\":\"must not overwrite\"}"
+    property int startFailures: 0
+    property bool phasesDone: false
+
+    function maybeFinish() {
+        if (!root.phasesDone || root.startFailures < 2) return
+        console.log("SECURE_HARNESS_OK: CAS queue, watcher reload, exact newlines, future-schema cancellation, and helper start failure")
+        Qt.quit()
+    }
+
+    function startFailure(kind, error) {
+        if (String(error).indexOf("could not start") < 0) {
+            console.error("SECURE_HARNESS_FAILURE: missing interpreter " + kind + " reported " + error)
+            Qt.quit()
+            return
+        }
+        root.startFailures++
+        if (kind === "read" && !missingStore.save("{}")) {
+            console.error("SECURE_HARNESS_FAILURE: missing interpreter write did not start")
+            Qt.quit()
+            return
+        }
+        root.maybeFinish()
+    }
+
+    // A helper that cannot start must still report failure for reads and
+    // writes instead of leaving `ready` false forever.
+    Components.SecureFile {
+        id: missingStore
+        path: Quickshell.env("HOME") + "/.config/omarchy/omatype-settings.json"
+        maxBytes: 262144
+        compareAndSwap: false
+        helperInterpreter: "/nonexistent/omatype-test-interpreter"
+        onLoaded: function(text, exists) {
+            console.error("SECURE_HARNESS_FAILURE: missing interpreter read succeeded")
+            Qt.quit()
+        }
+        onLoadFailed: function(error) { root.startFailure("read", error) }
+        onSaved: {
+            console.error("SECURE_HARNESS_FAILURE: missing interpreter write succeeded")
+            Qt.quit()
+        }
+        onSaveFailed: function(error) { root.startFailure("write", error) }
+    }
 
     Components.SecureFile {
         id: store
@@ -105,10 +148,11 @@ ShellRoot {
             } else if (root.phase === 6) {
                 if (!exists || text !== root.futurePayload) {
                     console.error("SECURE_HARNESS_FAILURE: future settings were overwritten · text=" + text)
-                } else {
-                    console.log("SECURE_HARNESS_OK: CAS queue, watcher reload, exact newlines, and future-schema cancellation")
+                    Qt.quit()
+                    return
                 }
-                Qt.quit()
+                root.phasesDone = true
+                root.maybeFinish()
             }
         }
         onLoadFailed: function(error) {
@@ -146,7 +190,7 @@ ShellRoot {
         interval: 12000
         running: true
         onTriggered: {
-            console.error("SECURE_HARNESS_FAILURE: timeout at phase " + root.phase + " saves=" + root.savesCompleted + " external=" + root.externalSavesCompleted)
+            console.error("SECURE_HARNESS_FAILURE: timeout at phase " + root.phase + " saves=" + root.savesCompleted + " external=" + root.externalSavesCompleted + " startFailures=" + root.startFailures)
             Qt.quit()
         }
     }

@@ -23,8 +23,10 @@ test("overlay owns the real Quattro lifecycle and layer surface", () => {
     "WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive",
     "ExclusionMode.Ignore",
     "visible: root.opened",
-    "shell.hide(\"jobo.omatype\")"
+    "readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : \"jobo.omatype\"",
+    "shell.hide(root.pluginId)"
   ]);
+  assert.doesNotMatch(q, /shell\.hide\("jobo\.omatype"\)/);
 });
 
 test("overlay targets the invoking bar output or focused Hyprland monitor", () => {
@@ -51,7 +53,8 @@ test("overlay targets the invoking bar output or focused Hyprland monitor", () =
     "function launchPayload()",
     "button.QsWindow.window",
     "window.screen.name",
-    "root.bar.run(\"omarchy-shell shell toggle jobo.omatype \" + root.launchPayload())"
+    "function toggleOverlay()",
+    "api.toggle(root.pluginId, payload) === true"
   ]);
 });
 
@@ -280,6 +283,22 @@ test("active runs stay isolated from config reloads and settings remain visible"
   ]);
 });
 
+test("own settings saves echo back without replacing the visible setup", () => {
+  const q = read("OmaType.qml");
+  includesAll(q, [
+    'property string settingsSavedRevision: ""',
+    "root.settingsSavedRevision = settingsStore.revision",
+    "var externalChange = settingsStore.revision !== root.settingsSavedRevision",
+    "root.loadSettings(externalChange)",
+    'settingsSavedRevision = ""'
+  ]);
+  assert.doesNotMatch(q, /if \(root\.settingsReady && value\) root\.loadSettings\(true\)/);
+  const saved = q.slice(q.indexOf("id: settingsStore"), q.indexOf("id: settingsAdapter"));
+  assert.ok(saved.indexOf("root.settingsSavedRevision = settingsStore.revision") > saved.indexOf("onSaved:"));
+  const closeBody = q.slice(q.indexOf("function close()"), q.indexOf("function dismiss()"));
+  includesAll(closeBody, ['settingsSavedRevision = ""']);
+});
+
 test("QML runtime modules avoid unsupported Node globals and globalThis fallbacks", () => {
   for (const file of ["src/typing-state.js", "src/history.js", "src/progress.js"]) {
     const source = read(file);
@@ -296,10 +315,16 @@ test("bar widget uses the supported Quattro bar host contract", () => {
     "BarIconButton",
     "bar: root.bar",
     "tooltipText:",
-    `root.bar.run("omarchy-shell shell toggle jobo.omatype " + root.launchPayload())`,
+    'property string moduleName: "jobo.omatype"',
+    "readonly property string pluginId:",
+    "var api = root.bar ? root.bar.shell : null",
+    `root.bar.run("omarchy-shell shell toggle " + root.pluginId + " '" + payload + "'")`,
+    "if (mouseButton === Qt.LeftButton) root.toggleOverlay()",
     "Components.SecureFile",
     "loading history…",
-    "lastWpm"
+    "property real lastWpm: 0",
+    "History.cleanEntry(entries[0]",
+    "root.lastWpm = latest ? Number(latest.wpm || 0) : 0"
   ]);
   assert.doesNotMatch(q, /signal activated/);
 });

@@ -23,6 +23,8 @@ Item {
 
     property var shell: null
     property var manifest: null
+    // The host injects the manifest; cloned plugins carry a different id.
+    readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : "jobo.omatype"
     property bool opened: false
     property string mode: "time"
     property int amount: 30
@@ -53,6 +55,13 @@ Item {
     property bool csvWritePending: false
     property bool settingsWritePending: false
     property string settingsStatus: ""
+    // Revision of the last settings document this instance wrote, so the
+    // watcher echo of our own save is told apart from an external edit.
+    property string settingsSavedRevision: ""
+    // Persistence failures the user would otherwise only see on the console.
+    property string persistenceStatus: ""
+    readonly property string footerStatus: [root.persistenceStatus, root.settingsOpen ? "" : root.settingsStatus]
+        .filter(function(part) { return part !== "" }).join("    · ")
     property bool settingsReady: false
     property bool settingsCurrentResolved: false
     property bool settingsCurrentExists: false
@@ -139,6 +148,10 @@ Item {
         if (item) activeWordY = item.y
     })
 
+    function shortError(error) {
+        return String(error || "").replace(/\s+/g, " ").trim().slice(0, 80)
+    }
+
     function isPrintable(text) {
         if (typeof text !== "string" || Array.from(text).length !== 1) return false
         var codePoint = text.codePointAt(0)
@@ -188,10 +201,17 @@ Item {
             root.settingsCurrentResolved = true
             root.settingsCurrentExists = exists || !!error
             root.settingsCurrentStatus = error ? "unavailable" : !exists ? "absent" : document.status
+            if (error) root.persistenceStatus = "settings unavailable · " + root.shortError(error)
             root.settingsCurrentValue = value
             if (root.settingsCurrentStatus === "unsupported") settingsStore.cancelQueuedWrite()
             if (value) root.applySettingsAdapter(settingsAdapter, value)
-            if (root.settingsReady && value) root.loadSettings(true)
+            if (root.settingsReady && value) {
+                // Our own save echoes back through the watcher carrying the
+                // revision we just wrote. Only an external change may replace
+                // the visible setup, which can hold a one-shot IPC override.
+                var externalChange = settingsStore.revision !== root.settingsSavedRevision
+                root.loadSettings(externalChange)
+            }
         } else {
             root.legacySettingsResolved = true
             root.legacySettingsExists = exists || !!error
@@ -491,13 +511,14 @@ Item {
 
     function close() {
         opened = false
+        settingsSavedRevision = ""
         settingsOpen = false
         languagePanelOpen = false
         progressOpen = false
     }
 
     function dismiss() {
-        if (shell && typeof shell.hide === "function") shell.hide("jobo.omatype")
+        if (shell && typeof shell.hide === "function") shell.hide(root.pluginId)
         else close()
     }
 
@@ -1030,7 +1051,10 @@ Item {
             else if (root.historyReloadAfterFailure)
                 root.finishHistoryRead(text, exists, "")
         }
-        onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }
+        onLoadFailed: function(error) {
+            root.persistenceStatus = "history unavailable · " + root.shortError(error)
+            root.finishHistoryRead("", false, error)
+        }
         onSaved: root.completeHistoryWrite(true, "", false)
         onSaveFailed: function(error) { root.completeHistoryWrite(false, error, false) }
         onSaveConflict: function(error) { root.completeHistoryWrite(false, error, true) }
@@ -1098,12 +1122,13 @@ Item {
         onLoaded: function(text, exists) { root.finishSettingsRead(true, text, exists, "") }
         onLoadFailed: function(error) { root.finishSettingsRead(true, "", false, error) }
         onSaved: {
+            root.settingsSavedRevision = settingsStore.revision
             root.settingsWritePending = settingsStore.writePending
             root.settingsStatus = ""
         }
         onSaveFailed: function(error) {
             root.settingsWritePending = settingsStore.writePending
-            root.settingsStatus = "settings were not saved"
+            root.settingsStatus = "settings were not saved · " + root.shortError(error)
             console.warn("OmaType settings save failed: " + error)
         }
         onSaveConflict: function(error) {
@@ -1994,6 +2019,19 @@ Item {
                     color: root.mutedColor
                     font.family: root.typeface
                     font.pixelSize: 11
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: surface.height - 58
+                    visible: root.footerStatus !== "" && !root.focusMode
+                    text: root.footerStatus
+                    textFormat: Text.PlainText
+                    color: root.errorColor
+                    font.family: root.typeface
+                    font.pixelSize: 11
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: root.footerStatus
                 }
             }
         }
