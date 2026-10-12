@@ -98,7 +98,9 @@ test("all persistence paths use secure caps and explicit normalization", () => {
     'historyStore.save(serialized)',
     'csvStore.save(History.toCsv(document))'
   ]);
-  includesAll(bar, ["Components.SecureFile", "History.normalize(JSON.parse(text))", "maxBytes: 16777216"]);
+  includesAll(bar, ["Components.SecureFile", "History.cleanEntry(entries[0]", "maxBytes: 16777216"]);
+  // The widget shows one number; it must not normalize the whole document.
+  assert.doesNotMatch(bar, /History\.normalize|historyAdapter/);
 });
 
 test("future current settings fail closed before normalization or persistence", () => {

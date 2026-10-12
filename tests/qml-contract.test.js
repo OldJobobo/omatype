@@ -306,7 +306,9 @@ test("bar widget uses the supported Quattro bar host contract", () => {
     "if (mouseButton === Qt.LeftButton) root.toggleOverlay()",
     "Components.SecureFile",
     "loading history…",
-    "lastWpm"
+    "property real lastWpm: 0",
+    "History.cleanEntry(entries[0]",
+    "root.lastWpm = latest ? Number(latest.wpm || 0) : 0"
   ]);
   assert.doesNotMatch(q, /signal activated/);
 });

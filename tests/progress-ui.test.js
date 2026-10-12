@@ -233,12 +233,14 @@ test("chart rejects null pace, spaces chronology honestly, and exposes a compact
 test("bar history display supports v1 and v2 and fails closed for future schemas", () => {
   const bar = read("BarWidget.qml");
   includesAll(bar, [
-    'historyAdapter.schemaVersion === 1 || historyAdapter.schemaVersion === 2',
-    'historyAdapter.schemaVersion === 1 && historyAdapter.entries.length === 0',
-    '? historyAdapter.tests : historyAdapter.entries',
-    'root.supportedHistorySchema && root.visibleHistoryEntries.length > 0',
-    'property var tests: []'
+    'if (schema === undefined || schema === 1 || schema === History.SCHEMA_VERSION)',
+    'Array.isArray(document.entries) && document.entries.length > 0 ? document.entries',
+    ': Array.isArray(document.tests) ? document.tests : []',
+    'History.cleanEntry(entries[0], schema === History.SCHEMA_VERSION ? schema : 1)',
+    'root.historyAvailable = available'
   ]);
+  // A future schema leaves available false, so the tooltip never shows a stale number.
+  assert.ok(bar.lastIndexOf("available = true") > bar.indexOf("schema === History.SCHEMA_VERSION)"));
 });
 
 test("visible narrow runtime harness covers exact filter reveal, reopen, null chart, and legacy migration", () => {

@@ -273,3 +273,14 @@ test("source tier cardinalities fail closed while one entry overflow still compa
   assert.equal(History.normalize({schemaVersion: 2, archive: Array(History.MAX_ARCHIVE + 1).fill({})}), null);
   assert.ok(compacted.archive.length <= History.MAX_ARCHIVE);
 });
+
+test("published documents keep the newest run first so readers can take entries[0]", () => {
+  const older = {timestamp: "2026-01-01T12:00:00.000Z", mode: "time", amount: 30, language: "english", wpm: 40, characters: 100, seed: "a"};
+  const newer = {timestamp: "2026-01-02T12:00:00.000Z", mode: "time", amount: 30, language: "english", wpm: 55, characters: 100, seed: "b"};
+  const document = History.add(History.add(History.clear(), newer), older);
+  assert.equal(document.entries[0].wpm, 55);
+  assert.equal(History.cleanEntry(document.entries[0], History.SCHEMA_VERSION).wpm, 55);
+  const legacy = History.normalize({schemaVersion: 1, tests: [older, newer]});
+  assert.equal(legacy.entries[0].wpm, 55);
+  assert.equal(History.cleanEntry(legacy.entries[0], 1).wpm, 55);
+});

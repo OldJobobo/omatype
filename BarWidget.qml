@@ -16,11 +16,7 @@ Item {
     property bool historyReady: false
     property bool historyAvailable: false
     property string historyError: ""
-    readonly property bool supportedHistorySchema: root.historyAvailable && (historyAdapter.schemaVersion === 1 || historyAdapter.schemaVersion === 2)
-    readonly property var visibleHistoryEntries: historyAdapter.schemaVersion === 1 && historyAdapter.entries.length === 0
-        ? historyAdapter.tests : historyAdapter.entries
-    readonly property real lastWpm: root.supportedHistorySchema && root.visibleHistoryEntries.length > 0
-        ? Number(root.visibleHistoryEntries[0].wpm || 0) : 0
+    property real lastWpm: 0
 
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
@@ -41,22 +37,31 @@ Item {
         if (root.bar) root.bar.run("omarchy-shell shell toggle " + root.pluginId + " '" + payload + "'")
     }
 
+    // The overlay always publishes a normalized document with the newest run
+    // first, so the widget only cleans that one entry instead of normalizing
+    // up to 2,000 runs plus rollups on every bar instance and every change.
     function finishHistoryRead(text, exists, error) {
-        var document = null
-        if (!error && !exists) document = History.clear()
+        var available = false
+        var latest = null
+        if (!error && !exists) available = true
         else if (!error) {
-            try { document = History.normalize(JSON.parse(text)) }
-            catch (parseError) { document = null }
+            try {
+                var document = JSON.parse(text)
+                var schema = document && typeof document === "object" && !Array.isArray(document) ? document.schemaVersion : null
+                if (schema === undefined || schema === 1 || schema === History.SCHEMA_VERSION) {
+                    available = true
+                    var entries = Array.isArray(document.entries) && document.entries.length > 0 ? document.entries
+                        : Array.isArray(document.tests) ? document.tests : []
+                    latest = entries.length > 0 ? History.cleanEntry(entries[0], schema === History.SCHEMA_VERSION ? schema : 1) : null
+                }
+            } catch (parseError) {
+                available = false
+            }
         }
         root.historyReady = true
-        root.historyAvailable = !!document
+        root.historyAvailable = available
         root.historyError = error ? String(error) : ""
-        if (!document) return
-        historyAdapter.schemaVersion = document.schemaVersion
-        historyAdapter.entries = document.entries || []
-        historyAdapter.tests = document.tests || []
-        historyAdapter.rollups = document.rollups || []
-        historyAdapter.archive = document.archive || []
+        root.lastWpm = latest ? Number(latest.wpm || 0) : 0
     }
 
     Components.SecureFile {
@@ -66,15 +71,6 @@ Item {
         watchChanges: true
         onLoaded: function(text, exists) { root.finishHistoryRead(text, exists, "") }
         onLoadFailed: function(error) { root.finishHistoryRead("", false, error) }
-    }
-
-    QtObject {
-        id: historyAdapter
-        property int schemaVersion: 1
-        property var entries: []
-        property var tests: []
-        property var rollups: []
-        property var archive: []
     }
 
     BarIconButton {
